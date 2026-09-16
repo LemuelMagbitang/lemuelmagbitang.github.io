@@ -1,0 +1,890 @@
+document.addEventListener('DOMContentLoaded', () => {
+
+  /* =========================================
+     0. YOUR SWITCHES — edit these two, nothing else
+     ========================================= */
+
+  // Right-click / "Save Image As" protection on lightbox artworks.
+  // true  = right-click and drag-to-save are disabled on artworks.
+  // false = artworks behave like normal images.
+  const PROTECTION_ENABLED = true;
+
+  // Web3Forms has a monthly response limit on the free plan. Flip
+  // either of these to false when you're close to it (or just want
+  // people to email you directly instead) and the form on the page
+  // is automatically swapped for an "Email Me" button — no HTML
+  // editing needed either way.
+  const FORMS_ENABLED = {
+    project: true, // "START A PROJECT WITH LM." form
+    review: true   // "LEAVE A REVIEW" form
+  };
+
+  // Shows/hides the little "2D" / "3D" / "Motion" pill(s) in the
+  // top-left corner of every project card. Doesn't affect filtering —
+  // that still works off the card's classes either way.
+  const SHOW_CARD_BADGES = true;
+
+  // Shows/hides the whole client reviews section (the scrolling wall of
+  // review cards above the footer). Set to false if you don't have
+  // enough reviews yet, or just want it off the page for a while.
+  const SHOW_REVIEWS = false;
+
+
+  /* =========================================
+     1. PROJECT CARD SETUP (badges + fallback thumbnails)
+     ========================================= */
+  // Hides every badge pill if you've switched them off above.
+  if (!SHOW_CARD_BADGES) {
+    document.querySelectorAll('.card-badges').forEach(el => {
+      el.style.display = 'none';
+    });
+  }
+
+  // If a project card's <div class="card-thumbnail"> was left empty
+  // (no <img> inside, or an <img> with no src) this fills it in using
+  // the card's own first media-list item instead — an image if the
+  // first item is data-image, or a YouTube thumbnail if it's
+  // data-youtube. Runs once, before anything else reads the grid.
+  function fillMissingThumbnails() {
+    document.querySelectorAll('.project-card').forEach(card => {
+      const thumbWrap = card.querySelector('.card-thumbnail');
+      if (!thumbWrap) return;
+
+      const existingImg = thumbWrap.querySelector('img');
+      if (existingImg && existingImg.getAttribute('src')) return; // already has one
+
+      const firstImageItem = card.querySelector('.project-media-list .media-item[data-image]');
+      const firstVideoItem = card.querySelector('.project-media-list .media-item[data-youtube]');
+
+      let fallbackSrc = null;
+
+      if (firstImageItem) {
+        fallbackSrc = firstImageItem.getAttribute('data-image');
+      } else if (firstVideoItem) {
+        const { id } = parseYouTubeUrl(firstVideoItem.getAttribute('data-youtube'));
+        if (id) fallbackSrc = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+      }
+
+      if (!fallbackSrc) return; // this card has nothing to fall back to
+
+      const titleEl = card.querySelector('.glass-info h3');
+      const altText = titleEl ? titleEl.textContent : 'Project artwork';
+
+      if (existingImg) {
+        existingImg.src = fallbackSrc;
+      } else {
+        const img = document.createElement('img');
+        img.src = fallbackSrc;
+        img.alt = altText;
+        thumbWrap.appendChild(img);
+      }
+    });
+  }
+  fillMissingThumbnails();
+
+  // Lets you manually fine-tune where a thumbnail crops/zooms — for
+  // artwork where the automatic center-crop cuts off the wrong part,
+  // or where the source image has its own padding/background baked in
+  // (common with staged 3D renders — cropping in with data-zoom is
+  // usually the fix, since CSS can't remove pixels that are part of
+  // the image file itself).
+  //
+  // Add any of these to the thumbnail <img> itself:
+  //   data-focus="30% 10%"   -> which part of the image stays visible
+  //                              (same idea as the hero banner's data-focus)
+  //   data-zoom="1.3"        -> zooms in (1 = normal, 1.3 = 30% closer)
+  //   data-rotate="2"        -> rotates in degrees, rarely needed
+  //
+  // Relying on the automatic fallback thumbnail instead of writing an
+  // <img> by hand? Put these same three attributes on the
+  // <div class="card-thumbnail"> wrapper itself — same effect, since
+  // there's no <img> yet for you to add them to directly.
+  function applyThumbnailAdjustments() {
+    document.querySelectorAll('.project-card .card-thumbnail').forEach(wrap => {
+      const img = wrap.querySelector('img');
+      if (!img) return;
+
+      const focus = img.getAttribute('data-focus') || wrap.getAttribute('data-focus');
+      const zoom = img.getAttribute('data-zoom') || wrap.getAttribute('data-zoom');
+      const rotate = img.getAttribute('data-rotate') || wrap.getAttribute('data-rotate');
+
+      if (focus) img.style.objectPosition = focus;
+      if (zoom) img.style.setProperty('--thumb-zoom', zoom);
+      if (rotate) img.style.setProperty('--thumb-rotate', rotate + 'deg');
+    });
+  }
+  applyThumbnailAdjustments();
+
+
+  /* =========================================
+     2. HAMBURGER MENU
+     ========================================= */
+  const hamburger = document.getElementById('hamburger');
+  const navLinks = document.getElementById('navLinks');
+
+  if (hamburger && navLinks) {
+    hamburger.addEventListener('click', () => {
+      const isOpen = navLinks.classList.toggle('active');
+      document.body.classList.toggle('menu-open', isOpen);
+    });
+
+    // Tapping anywhere outside the open menu (the dimmed backdrop, a
+    // nav link, anywhere) closes it — standard mobile menu behavior.
+    document.addEventListener('click', (e) => {
+      if (!document.body.classList.contains('menu-open')) return;
+      if (navLinks.contains(e.target) || hamburger.contains(e.target)) return;
+      navLinks.classList.remove('active');
+      document.body.classList.remove('menu-open');
+    });
+
+    // Clicking any link inside the menu also closes it — matters most
+    // for the Works > 3D & Motion / Illustration / UI-UX links, since
+    // those change the page via a hash and don't force a full reload.
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        navLinks.classList.remove('active');
+        document.body.classList.remove('menu-open');
+      });
+    });
+  }
+
+
+  /* =========================================
+     3. CONTACT FORMS <-> EMAIL ME TOGGLE
+     ========================================= */
+  function applyFormToggle(formEl, emailBtnEl, isEnabled) {
+    if (!formEl || !emailBtnEl) return;
+    formEl.style.display = isEnabled ? '' : 'none';
+    emailBtnEl.style.display = isEnabled ? 'none' : 'flex';
+  }
+
+  applyFormToggle(
+    document.getElementById('projectForm'),
+    document.getElementById('projectEmailBtn'),
+    FORMS_ENABLED.project
+  );
+
+  applyFormToggle(
+    document.getElementById('reviewForm'),
+    document.getElementById('reviewEmailBtn'),
+    FORMS_ENABLED.review
+  );
+
+
+  /* =========================================
+     4. HERO BANNER — AUTO-FILLED WITH THE
+        5 LATEST ARTWORKS + FACE-AWARE FOCUS
+     ========================================= */
+  // "Latest" = whichever 5 project cards are FIRST in index.html's grid.
+  // To change what shows in the hero, reorder your project cards there.
+  //
+  // On the Works page, we read the cards straight from this same page.
+  // On any other page (like About), there's no grid to read from, so we
+  // fetch index.html in the background and pull the same 5 thumbnails
+  // from it — meaning both pages always stay in sync automatically.
+  //
+  // NOTE: the fetch only works when the site is actually being served
+  // (e.g. on GitHub Pages, or a local dev server). If you open about.html
+  // by double-clicking the file, browsers block this for local files,
+  // and the About hero will just stay empty until viewed on a real server.
+  //
+  // FOCUS POINT — how each slide decides where to "look":
+  //   1. Manual override always wins. Add data-focus="50% 10%" to a
+  //      project's thumbnail <img> in index.html and the hero (and About
+  //      hero) will crop/zoom around that exact point for that artwork.
+  //   2. Otherwise, if the visitor's browser supports native face
+  //      detection, we quietly detect the face and center the crop and
+  //      zoom on it — no library, no download, just a browser API.
+  //   3. Otherwise, it falls back to the top-biased crop already set in
+  //      style.css (object-position: center 18%), which is a safe default
+  //      for character art and portraits.
+
+  async function applyFocalPoint(slideImg, sourceImg) {
+    const manualFocus = sourceImg.getAttribute('data-focus');
+    if (manualFocus) {
+      slideImg.style.objectPosition = manualFocus;
+      slideImg.style.transformOrigin = manualFocus;
+      return;
+    }
+
+    // Progressive enhancement only — most browsers don't support this
+    // yet, so this silently does nothing and the CSS default (top-biased
+    // crop) is what visitors see. Nothing breaks either way.
+    if (!('FaceDetector' in window)) return;
+
+    try {
+      const detector = new window.FaceDetector({ maxDetectedFaces: 1, fastMode: true });
+      const faces = await detector.detect(slideImg);
+      if (!faces.length) return;
+
+      const box = faces[0].boundingBox;
+      const naturalW = slideImg.naturalWidth || slideImg.width;
+      const naturalH = slideImg.naturalHeight || slideImg.height;
+      if (!naturalW || !naturalH) return;
+
+      const focusX = ((box.x + box.width / 2) / naturalW) * 100;
+      const focusY = ((box.y + box.height / 2) / naturalH) * 100;
+      const focusPoint = `${focusX.toFixed(1)}% ${focusY.toFixed(1)}%`;
+
+      // Smoothly re-center onto the detected face rather than snapping.
+      slideImg.style.transition = 'object-position 1.2s ease, transform-origin 1.2s ease, opacity 1.5s ease-in-out';
+      slideImg.style.objectPosition = focusPoint;
+      slideImg.style.transformOrigin = focusPoint;
+    } catch (err) {
+      // Detection unsupported/failed on this device — keep the default crop.
+    }
+  }
+
+  async function initHeroBanner() {
+    const heroContainer = document.getElementById('heroBanner') || document.getElementById('heroBannerAbout');
+    if (!heroContainer) return; // this page has no hero banner at all
+
+    let sourceThumbnails = document.querySelectorAll('#portfolioGrid .project-card .card-thumbnail img');
+
+    if (sourceThumbnails.length === 0) {
+      // No grid on this page — go fetch it from the site's root
+      // index.html instead. This page (About) now lives one folder
+      // down at /about/, so the root is "../" from here.
+      try {
+        const response = await fetch('../index.html');
+        const htmlText = await response.text();
+        const parsedDoc = new DOMParser().parseFromString(htmlText, 'text/html');
+        sourceThumbnails = parsedDoc.querySelectorAll('#portfolioGrid .project-card .card-thumbnail img');
+      } catch (err) {
+        console.warn('Hero banner: could not load artwork from index.html.', err);
+        return;
+      }
+    }
+
+    const latestFive = Array.from(sourceThumbnails).slice(0, 5);
+    if (latestFive.length === 0) return;
+
+    latestFive.forEach((sourceImg, i) => {
+      const slide = document.createElement('img');
+      slide.src = sourceImg.getAttribute('src');
+      slide.alt = sourceImg.getAttribute('alt') || 'Featured artwork';
+      slide.className = 'slide' + (i === 0 ? ' active' : '');
+      heroContainer.appendChild(slide);
+
+      if (slide.complete) {
+        applyFocalPoint(slide, sourceImg);
+      } else {
+        slide.addEventListener('load', () => applyFocalPoint(slide, sourceImg), { once: true });
+      }
+    });
+
+    startHeroCrossfade(heroContainer);
+  }
+
+  function startHeroCrossfade(heroContainer) {
+    const slides = heroContainer.querySelectorAll('.slide');
+    if (slides.length <= 1) return;
+
+    let currentSlide = 0;
+    setInterval(() => {
+      slides[currentSlide].classList.remove('active');
+      currentSlide = (currentSlide + 1) % slides.length;
+      slides[currentSlide].classList.add('active');
+    }, 3500); // changes every 3.5 seconds
+  }
+
+  initHeroBanner();
+
+
+  /* =========================================
+     5. FILTERING & SHOW MORE/LESS (with the
+        blurred "peek" effect)
+     ========================================= */
+  const filterBtns = document.querySelectorAll('.tab-btn');
+  const allCards = Array.from(document.querySelectorAll('.project-card'));
+  const showMoreBtn = document.getElementById('showMoreBtn');
+  const showMoreWrapper = document.getElementById('showMoreWrapper');
+  const portfolioGrid = document.getElementById('portfolioGrid');
+  const gridFadeOverlay = document.getElementById('gridFadeOverlay');
+
+  let currentFilter = 'all';
+  let isExpanded = false;
+
+  // How many cards to reveal before "Show More" kicks in.
+  // 5 on mobile, 9 on desktop/wide screens — change these two numbers
+  // if you ever want different amounts.
+  function getBaseCount() {
+    return window.innerWidth < 768 ? 5 : 9;
+  }
+  let baseCount = getBaseCount();
+
+  // Measures exactly how tall the grid needs to be to show `limit` cards
+  // in full, plus a small "peek" of the next row so people can tell
+  // there's more underneath the fade.
+  function computeCollapsedHeight(filteredCards, limit) {
+    if (filteredCards.length <= limit) return null; // everything already fits
+
+    const gridRect = portfolioGrid.getBoundingClientRect();
+    const lastVisibleCard = filteredCards[limit - 1];
+    const cardRect = lastVisibleCard.getBoundingClientRect();
+    const peekAmount = window.innerWidth < 768 ? 40 : 70;
+
+    return Math.round((cardRect.bottom - gridRect.top) + peekAmount);
+  }
+
+  function renderGallery() {
+    if (allCards.length === 0) return;
+
+    const filteredCards = allCards.filter(card =>
+      currentFilter === 'all' || card.classList.contains(currentFilter)
+    );
+    const nonMatchingCards = allCards.filter(card => !filteredCards.includes(card));
+
+    // Cards leaving the filter fade out first, then actually leave the
+    // grid once that fade finishes — a soft cut instead of an instant
+    // snap. (Opacity only, never a transform: that keeps every card's
+    // real layout box exact while it's mid-fade, which the "peek"
+    // height math just below depends on.)
+    nonMatchingCards.forEach(card => { card.style.opacity = '0'; });
+    setTimeout(() => {
+      nonMatchingCards.forEach(card => {
+        // Guards against rapid tab-clicking: only actually hide it if
+        // it's still meant to be hidden by now.
+        const stillHidden = currentFilter !== 'all' && !card.classList.contains(currentFilter);
+        if (stillHidden) card.style.display = 'none';
+      });
+    }, 300);
+
+    // Cards entering the filter need to actually be laid out before
+    // their opacity can transition (an element can't fade in from
+    // display:none — there's nothing to animate from), so lay them out
+    // this frame and fade them in on the next.
+    filteredCards.forEach(card => { card.style.display = 'block'; });
+    requestAnimationFrame(() => {
+      filteredCards.forEach(card => { card.style.opacity = '1'; });
+    });
+
+    const needsCollapsing = !isExpanded && filteredCards.length > baseCount;
+
+    if (needsCollapsing) {
+      const collapsedHeight = computeCollapsedHeight(filteredCards, baseCount);
+      portfolioGrid.style.maxHeight = collapsedHeight + 'px';
+      if (gridFadeOverlay) gridFadeOverlay.classList.remove('is-hidden');
+    } else {
+      portfolioGrid.style.maxHeight = 'none';
+      if (gridFadeOverlay) gridFadeOverlay.classList.add('is-hidden');
+    }
+
+    // Show More / Show Less button + label. The wrapper switches between
+    // "floating over the grid" and "sitting in normal flow" via the
+    // .expanded class already defined in style.css — this is the other
+    // half of what keeps it from drifting underneath cards on mobile.
+    if (showMoreBtn && showMoreWrapper) {
+      const btnText = showMoreBtn.querySelector('.btn-text');
+
+      if (filteredCards.length > baseCount) {
+        showMoreWrapper.style.display = 'flex';
+        showMoreWrapper.classList.toggle('expanded', isExpanded);
+        showMoreBtn.classList.toggle('expanded', isExpanded);
+        if (btnText) btnText.textContent = isExpanded ? 'SHOW LESS' : 'SHOW MORE';
+      } else {
+        showMoreWrapper.style.display = 'none';
+      }
+    }
+  }
+
+  // Handle Filter Clicks
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      currentFilter = btn.getAttribute('data-filter');
+      isExpanded = false; // start collapsed again on category change
+      renderGallery();
+
+      // Keep the address bar in sync with whichever tab is active, so
+      // copying the URL after clicking a tab always gives the right
+      // shareable link — no need to go through the Works dropdown.
+      // replaceState (not pushState) so tab-clicking doesn't spam
+      // "back" history with every filter change.
+      const newHash = currentFilter === 'all' ? '' : '#' + currentFilter;
+      history.replaceState(null, '', window.location.pathname + window.location.search + newHash);
+    });
+  });
+
+  // Handle Show More / Show Less Click
+  if (showMoreBtn) {
+    showMoreBtn.addEventListener('click', () => {
+      isExpanded = !isExpanded;
+      renderGallery();
+
+      if (!isExpanded) {
+        const filterTabs = document.querySelector('.filter-tabs');
+        if (filterTabs) filterTabs.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }
+
+  // Recalculate on resize — this is what makes the reveal count
+  // smoothly shift between 5 (mobile) and 9 (desktop), and keeps the
+  // "peek" cutoff accurate as columns reflow at any width. It only
+  // touches anything if Show More hasn't been clicked yet.
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      baseCount = getBaseCount();
+      if (!isExpanded) renderGallery();
+    }, 120);
+  });
+
+  // Initial gallery render — measured again once everything (fonts,
+  // thumbnails) has actually finished loading. This is what fixes the
+  // "Show More sits underneath a card" bug: the very first render can
+  // measure card positions a moment before web fonts/images settle into
+  // their final size, especially on a slower mobile connection. Re-running
+  // it after window 'load' guarantees the measurement matches what the
+  // visitor actually sees.
+  renderGallery();
+  window.addEventListener('load', () => {
+    baseCount = getBaseCount();
+    if (!isExpanded) renderGallery();
+  });
+
+  // DEEP-LINKING VIA URL HASH — lets the Works dropdown (and anyone you
+  // send a link like index.html#3d-motion) jump straight to a specific
+  // tab instead of landing on "All" and having to click it manually.
+  // The hash value must match a tab's data-filter exactly.
+  function applyFilterFromHash() {
+    const hash = decodeURIComponent(window.location.hash.replace('#', ''));
+    const matchingBtn = Array.from(filterBtns).find(b => b.getAttribute('data-filter') === hash);
+    if (!matchingBtn) return; // not a tab hash (e.g. "#contact-section") — ignore
+
+    filterBtns.forEach(b => b.classList.remove('active'));
+    matchingBtn.classList.add('active');
+    currentFilter = hash;
+    isExpanded = false;
+    renderGallery();
+
+    // Scroll to the tabs once layout has settled, so the visitor lands
+    // right on the filtered grid instead of the very top of the hero.
+    window.requestAnimationFrame(() => {
+      const filterTabsEl = document.querySelector('.filter-tabs');
+      if (filterTabsEl) filterTabsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+  applyFilterFromHash();
+  // Same-page hash changes (clicking another Works sub-link while
+  // already on index.html) don't reload the page, only fire this event.
+  window.addEventListener('hashchange', applyFilterFromHash);
+
+
+  /* =========================================
+     6. CLIENT REVIEWS — TWO-ROW BRICK LOOP
+     ========================================= */
+  // Splits whatever review cards are in the HTML into two rows (top row
+  // = 1st, 3rd, 5th... review; bottom row = 2nd, 4th, 6th...). Each row
+  // repeats its own cards as many times as needed to comfortably outrun
+  // a wide monitor — so a short review list still reads as a full,
+  // populated wall on a big screen instead of visibly running out and
+  // leaving blank space — then loops infinitely. You only ever need to
+  // write each review once in the HTML; this handles the rest, and
+  // re-measures whenever the window is resized.
+  const reviewsMarquee = document.querySelector('.reviews-marquee');
+  const reviewsTrack = document.getElementById('reviewsTrack');
+  const reviewsSection = document.querySelector('.reviews-section');
+  let pristineTopCards = null;
+  let pristineBottomCards = null;
+
+  if (!SHOW_REVIEWS) {
+    if (reviewsSection) reviewsSection.style.display = 'none';
+  }
+
+  function buildReviewsMarquee() {
+    if (!SHOW_REVIEWS) return;
+    if (!reviewsTrack || !reviewsMarquee) return;
+
+    // The very first run: read the real cards out of the HTML once and
+    // keep a clean, never-duplicated copy of each row's set. Every
+    // rebuild after that (e.g. on resize) starts fresh from this copy
+    // instead of duplicating what's already been duplicated.
+    if (!pristineTopCards) {
+      const cards = Array.from(reviewsTrack.children);
+      if (cards.length === 0) return;
+      pristineTopCards = cards.filter((_, i) => i % 2 === 0);
+      pristineBottomCards = cards.filter((_, i) => i % 2 !== 0);
+    }
+
+    reviewsTrack.innerHTML = '';
+    const containerWidth = reviewsMarquee.clientWidth || window.innerWidth;
+
+    [pristineTopCards, pristineBottomCards].forEach((pristineCards, i) => {
+      if (pristineCards.length === 0) return;
+
+      const row = document.createElement('div');
+      row.className = i === 0 ? 'reviews-row reviews-row-a' : 'reviews-row reviews-row-b';
+      pristineCards.forEach(card => row.appendChild(card.cloneNode(true)));
+      reviewsTrack.appendChild(row);
+
+      // Measure one full, un-duplicated set of this row's cards.
+      const setWidth = row.scrollWidth;
+      if (setWidth === 0) return;
+
+      // Repeat enough copies that two full sets' worth of width is
+      // always on screen — the actual guarantee an infinite marquee
+      // needs so it never visibly runs dry, on any monitor size.
+      const copiesNeeded = Math.max(1, Math.ceil((containerWidth * 2) / setWidth));
+      for (let c = 1; c < copiesNeeded; c++) {
+        pristineCards.forEach(card => row.appendChild(card.cloneNode(true)));
+      }
+
+      // The CSS animation reads this to know exactly how far to slide
+      // before looping — one set-width, however many copies follow it.
+      row.style.setProperty('--set-width', `${setWidth}px`);
+    });
+  }
+
+  buildReviewsMarquee();
+
+  let reviewsResizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(reviewsResizeTimeout);
+    reviewsResizeTimeout = setTimeout(buildReviewsMarquee, 200);
+  });
+
+
+  /* =========================================
+     7. LIGHTBOX MODAL
+     ========================================= */
+  const lightbox = document.getElementById('lightbox');
+  const lightboxControls = document.getElementById('lightboxControls');
+  const lightboxClose = document.getElementById('lightboxClose');
+  const lightboxPrev = document.querySelector('.lightbox-prev');
+  const lightboxNext = document.querySelector('.lightbox-next');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalDesc = document.getElementById('modalDesc');
+  const modalFullDesc = document.getElementById('modalFullDesc');
+  const modalMediaContainer = document.getElementById('lightboxMediaContainer');
+
+  let currentLightboxIndex = 0;
+  let activeLightboxCards = []; // Only navigate through currently filtered items
+
+  // Reads a YouTube URL and returns the video ID plus whether it's a Short.
+  // Supports: /shorts/ID, youtu.be/ID, watch?v=ID, and /embed/ID links.
+  function parseYouTubeUrl(url) {
+    let id = null;
+    let isShort = false;
+
+    if (url.includes('/shorts/')) {
+      id = url.split('/shorts/')[1].split(/[?&]/)[0];
+      isShort = true;
+    } else if (url.includes('youtu.be/')) {
+      id = url.split('youtu.be/')[1].split(/[?&]/)[0];
+    } else if (url.includes('watch?v=')) {
+      id = url.split('watch?v=')[1].split('&')[0];
+    } else if (url.includes('/embed/')) {
+      id = url.split('/embed/')[1].split(/[?&]/)[0];
+    }
+
+    return { id, isShort };
+  }
+
+  // Builds one artwork image with save-protection applied only when
+  // switched on at the top of this file (right-click + drag disabled,
+  // so there's no "Save Image As" path — no watermark, no zoom, just a
+  // clean image that can't be casually saved).
+  function buildImageMedia(imgUrl) {
+    const img = document.createElement('img');
+    img.src = imgUrl;
+    img.draggable = false;
+
+    if (PROTECTION_ENABLED) {
+      img.classList.add('no-save');
+      // Worth being upfront: no front-end trick can block a screenshot
+      // outright. This blocks the right-click "Save Image As" menu and
+      // drag-to-save, which covers casual reuse — a determined person
+      // with a screenshot tool can't be stopped client-side.
+      img.addEventListener('contextmenu', (e) => e.preventDefault());
+      img.addEventListener('dragstart', (e) => e.preventDefault());
+    }
+
+    return img;
+  }
+
+  // Builds a small caption under a media item — but only if there's
+  // actual text. Add one by putting data-description="..." on that
+  // <div class="media-item">; leave it off (or empty) and nothing
+  // renders, no empty box.
+  function buildMediaCaption(text) {
+    if (!text || !text.trim()) return null;
+    const p = document.createElement('p');
+    p.className = 'media-caption';
+    p.textContent = text.trim();
+    return p;
+  }
+
+  // Wraps one media element (image or video iframe) together with its
+  // optional caption so they stay grouped as a single unit.
+  function buildMediaEntry(mediaEl, captionText) {
+    const wrap = document.createElement('div');
+    wrap.className = 'lightbox-media-item';
+    wrap.appendChild(mediaEl);
+
+    const caption = buildMediaCaption(captionText);
+    if (caption) wrap.appendChild(caption);
+
+    return wrap;
+  }
+
+  function openLightbox(index) {
+    currentLightboxIndex = index;
+    const card = activeLightboxCards[currentLightboxIndex];
+
+    // 1. Populate Text
+    modalTitle.textContent = card.querySelector('.glass-info h3').textContent;
+    modalDesc.textContent = card.querySelector('.glass-info p').textContent;
+
+    const descEl = card.querySelector('.project-description');
+    modalFullDesc.innerHTML = descEl ? descEl.innerHTML : '';
+
+    // 2. Clear previous media to stop playing videos (and reset any zoom)
+    modalMediaContainer.innerHTML = '';
+
+    // 3. Populate Media (Images & YouTube)
+    const mediaList = card.querySelectorAll('.project-media-list .media-item');
+
+    if (mediaList.length > 0) {
+      mediaList.forEach(item => {
+        const imgUrl = item.getAttribute('data-image');
+        const ytUrl = item.getAttribute('data-youtube');
+        const videoUrl = item.getAttribute('data-video');
+        const caption = item.getAttribute('data-description');
+
+        if (imgUrl) {
+          modalMediaContainer.appendChild(buildMediaEntry(buildImageMedia(imgUrl), caption));
+        }
+
+        if (ytUrl) {
+          const { id, isShort } = parseYouTubeUrl(ytUrl);
+          const embedUrl = id ? `https://www.youtube.com/embed/${id}` : ytUrl;
+
+          const iframe = document.createElement('iframe');
+          iframe.src = embedUrl;
+          iframe.frameBorder = '0';
+          iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+          iframe.allowFullscreen = true;
+
+          // Orientation: a manual "data-orientation" attribute always wins.
+          // Otherwise, Shorts links default to portrait and everything
+          // else defaults to landscape.
+          const manualOrientation = item.getAttribute('data-orientation');
+          let orientationClass = 'yt-landscape';
+
+          if (manualOrientation === 'portrait') {
+            orientationClass = 'yt-portrait';
+          } else if (manualOrientation === 'square') {
+            orientationClass = 'yt-square';
+          } else if (manualOrientation === 'landscape') {
+            orientationClass = 'yt-landscape';
+          } else if (isShort) {
+            orientationClass = 'yt-portrait';
+          }
+
+          iframe.classList.add(orientationClass);
+          modalMediaContainer.appendChild(buildMediaEntry(iframe, caption));
+        }
+
+        if (videoUrl) {
+          const video = document.createElement('video');
+          video.src = videoUrl;
+          video.controls = true;
+          video.playsInline = true;
+          video.controlsList = 'nodownload';
+          video.disablePictureInPicture = true;
+
+          if (PROTECTION_ENABLED) {
+            video.classList.add('no-save');
+            video.addEventListener('contextmenu', (e) => e.preventDefault());
+          }
+
+          const manualVideoOrientation = item.getAttribute('data-orientation');
+
+          if (manualVideoOrientation === 'portrait') {
+            video.classList.add('yt-portrait');
+          } else if (manualVideoOrientation === 'square') {
+            video.classList.add('yt-square');
+          } else if (manualVideoOrientation === 'landscape') {
+            video.classList.add('yt-landscape');
+          } else {
+            // No manual override — start with a landscape placeholder
+            // (avoids a layout jump before the file loads), then read
+            // the video's own real width/height as soon as we know
+            // them and size it exactly to that, same spirit as how
+            // YouTube Shorts links get auto-detected as portrait.
+            video.classList.add('yt-landscape');
+
+            video.addEventListener('loadedmetadata', () => {
+              const ratio = video.videoWidth / video.videoHeight;
+
+              video.classList.remove('yt-landscape', 'yt-portrait', 'yt-square');
+              if (ratio > 1.15) {
+                video.classList.add('yt-landscape');
+              } else if (ratio < 0.85) {
+                video.classList.add('yt-portrait');
+              } else {
+                video.classList.add('yt-square');
+              }
+
+              // Exact proportions rather than a fixed 16:9 / 9:16 / 1:1
+              // template — the class above just sets a sensible max-size
+              // envelope for that general shape.
+              video.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+            });
+          }
+
+          modalMediaContainer.appendChild(buildMediaEntry(video, caption));
+        }
+      });
+    } else {
+      // Fallback: If no media list exists, just use the thumbnail
+      const fallbackSrc = card.querySelector('.card-thumbnail img').src;
+      modalMediaContainer.appendChild(buildImageMedia(fallbackSrc));
+    }
+
+    // 4. Show Lightbox and lock body scroll
+    lightbox.classList.add('active');
+    if (lightboxControls) lightboxControls.classList.add('active');
+    lightbox.scrollTop = 0;
+    document.body.style.overflow = 'hidden';
+  }
+
+  // Attach click events to all cards
+  allCards.forEach(card => {
+    card.addEventListener('click', () => {
+      activeLightboxCards = allCards.filter(c =>
+        currentFilter === 'all' || c.classList.contains(currentFilter)
+      );
+      const index = activeLightboxCards.indexOf(card);
+      openLightbox(index);
+    });
+  });
+
+  // Close Lightbox function
+  function closeLightbox() {
+    lightbox.classList.remove('active');
+    if (lightboxControls) lightboxControls.classList.remove('active');
+    document.body.style.overflow = ''; // Restore body scroll
+    modalMediaContainer.innerHTML = ''; // Destroys iframes to stop audio playing in background
+  }
+
+  // Event Listeners for Lightbox Controls
+  if (lightboxClose) {
+    lightboxClose.addEventListener('click', closeLightbox);
+  }
+
+  if (lightboxPrev) {
+    lightboxPrev.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentLightboxIndex > 0) {
+        openLightbox(currentLightboxIndex - 1);
+      } else {
+        openLightbox(activeLightboxCards.length - 1); // Loop to end
+      }
+    });
+  }
+
+  if (lightboxNext) {
+    lightboxNext.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (currentLightboxIndex < activeLightboxCards.length - 1) {
+        openLightbox(currentLightboxIndex + 1);
+      } else {
+        openLightbox(0); // Loop to start
+      }
+    });
+  }
+
+  // Close when clicking the dark background outside the modal interior
+  if (lightbox) {
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) {
+        closeLightbox();
+      }
+    });
+  }
+
+  // Close on 'Esc' key
+  document.addEventListener('keydown', (e) => {
+    if (lightbox && e.key === 'Escape' && lightbox.classList.contains('active')) {
+      closeLightbox();
+    }
+  });
+
+
+  /* =========================================
+     8. PAGE TRANSITION
+     ========================================= */
+  // A brief logo flourish, scoped tightly on purpose so it reads as a
+  // nice touch rather than a delay you feel on every click:
+  //  - Plays once on every fresh page load (Works, About, whichever).
+  //  - Also plays when leaving via a link that goes to a genuinely
+  //    different page (e.g. Works -> About).
+  //  - Never fires for filter tabs, the Works dropdown's same-page hash
+  //    links while already on that page, the lightbox, "Back to Top",
+  //    mailto/external links, or anything opening in a new tab.
+  const pageTransition = document.getElementById('pageTransition');
+
+  if (pageTransition) {
+    // Entrance: fade the logo in, hold briefly, then fade the whole
+    // overlay away to reveal the page. Runs on every load.
+    requestAnimationFrame(() => {
+      pageTransition.classList.add('is-entering');
+    });
+    setTimeout(() => {
+      pageTransition.classList.add('is-hidden');
+    }, 550);
+
+    // If the browser restores this page from its back/forward cache,
+    // the DOM can come back in whatever state it was in right as we
+    // navigated away — make sure that's never a dark screen stuck mid-
+    // transition.
+    window.addEventListener('pageshow', (e) => {
+      if (e.persisted) pageTransition.classList.add('is-hidden');
+    });
+
+    // Compares two pages by their real resolved path, treating
+    // "/about/", "/about/index.html" and "/about" as the same page.
+    // (The site now uses clean folder URLs — e.g. about/ instead of
+    // about.html — so comparing raw filenames like it used to doesn't
+    // work anymore: a directory URL's pathname ends in "/", and the
+    // old `.split('/').pop()` trick reads that as an empty string.)
+    function normalizedPagePath(pathname) {
+      let p = pathname.replace(/index\.html$/, '');
+      if (p.length > 1) p = p.replace(/\/+$/, '');
+      return p || '/';
+    }
+
+    function isRealPageNavigation(link) {
+      const href = link.getAttribute('href');
+      if (!href) return false;
+      if (href.startsWith('#')) return false;
+      if (href.startsWith('mailto:') || href.startsWith('tel:')) return false;
+      if (link.target === '_blank') return false;
+      if (/^https?:\/\//i.test(href)) return false; // external links
+
+      const linkUrl = new URL(href, window.location.href);
+      if (linkUrl.origin !== window.location.origin) return false;
+
+      return normalizedPagePath(linkUrl.pathname) !== normalizedPagePath(window.location.pathname);
+    }
+
+    document.querySelectorAll('a[href]').forEach(link => {
+      if (!isRealPageNavigation(link)) return;
+
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const destination = link.getAttribute('href');
+        pageTransition.classList.remove('is-hidden');
+        pageTransition.classList.add('is-entering');
+        setTimeout(() => { window.location.href = destination; }, 320);
+      });
+    });
+  }
+
+});
