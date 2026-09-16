@@ -199,8 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
   //      style.css (object-position: center 18%), which is a safe default
   //      for character art and portraits.
 
-  async function applyFocalPoint(slideImg, sourceImg) {
-    const manualFocus = sourceImg.getAttribute('data-focus');
+  async function applyFocalPoint(slideImg, manualFocus) {
     if (manualFocus) {
       slideImg.style.objectPosition = manualFocus;
       slideImg.style.transformOrigin = manualFocus;
@@ -235,41 +234,101 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Reads the first 5 project cards out of a document and returns a plain
+  // list of {src, alt, focus} for the hero to use.
+  //
+  // Why it reads data-image and not <img src>: in index.html most
+  // .card-thumbnail divs are left EMPTY on purpose, and script.js fills
+  // them in at runtime from each card's own first media-item. That works
+  // fine on the Works page (the script has already run by then), but a
+  // document pulled in with fetch() is raw HTML that never executed any
+  // JavaScript — so its thumbnails are still empty divs and looking for
+  // an <img> inside them finds nothing. Reading the same data-image
+  // attribute the runtime filler reads makes both paths agree.
+  //
+  // baseUrl matters for the same reason: paths in index.html like
+  // "assets/projects/..." are relative to the site root, so when the
+  // About page (at /about/) reuses them they must be resolved against
+  // the root rather than against /about/, or every slide 404s.
+  function collectHeroSources(doc, baseUrl) {
+    const cards = doc.querySelectorAll('#portfolioGrid .project-card');
+
+    return Array.from(cards).map(card => {
+      const thumbWrap = card.querySelector('.card-thumbnail');
+      const thumbImg = thumbWrap ? thumbWrap.querySelector('img') : null;
+
+      // Same order of preference as fillMissingThumbnails(): a real
+      // <img src> if one was written by hand, else the card's first
+      // data-image, else its first YouTube thumbnail.
+      let rawSrc = thumbImg ? thumbImg.getAttribute('src') : null;
+
+      if (!rawSrc) {
+        const firstImageItem = card.querySelector('.project-media-list .media-item[data-image]');
+        if (firstImageItem) {
+          rawSrc = firstImageItem.getAttribute('data-image');
+        } else {
+          const firstVideoItem = card.querySelector('.project-media-list .media-item[data-youtube]');
+          if (firstVideoItem) {
+            const { id } = parseYouTubeUrl(firstVideoItem.getAttribute('data-youtube'));
+            if (id) rawSrc = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+          }
+        }
+      }
+
+      if (!rawSrc) return null; // this card has no usable artwork
+
+      let src = rawSrc;
+      if (baseUrl) {
+        try { src = new URL(rawSrc, baseUrl).href; } catch (e) { /* keep raw */ }
+      }
+
+      const titleEl = card.querySelector('.glass-info h3');
+
+      return {
+        src,
+        alt: (thumbImg && thumbImg.getAttribute('alt')) || (titleEl ? titleEl.textContent : 'Featured artwork'),
+        focus: (thumbImg && thumbImg.getAttribute('data-focus')) || (thumbWrap && thumbWrap.getAttribute('data-focus')) || null
+      };
+    }).filter(Boolean);
+  }
+
   async function initHeroBanner() {
     const heroContainer = document.getElementById('heroBanner') || document.getElementById('heroBannerAbout');
     if (!heroContainer) return; // this page has no hero banner at all
 
-    let sourceThumbnails = document.querySelectorAll('#portfolioGrid .project-card .card-thumbnail img');
+    let heroSources = collectHeroSources(document, null);
 
-    if (sourceThumbnails.length === 0) {
-      // No grid on this page — go fetch it from the site's root
-      // index.html instead. This page (About) now lives one folder
-      // down at /about/, so the root is "../" from here.
+    if (heroSources.length === 0) {
+      // No grid on this page (i.e. we're on About) — pull the Works page
+      // in and read the same 5 cards from it. Resolved from this page's
+      // own location so it keeps working wherever the site is served
+      // from, root domain or a /Portfolio/ subpath.
       try {
-        const response = await fetch('../index.html');
+        const worksUrl = new URL('../', window.location.href).href;
+        const response = await fetch(worksUrl);
         const htmlText = await response.text();
         const parsedDoc = new DOMParser().parseFromString(htmlText, 'text/html');
-        sourceThumbnails = parsedDoc.querySelectorAll('#portfolioGrid .project-card .card-thumbnail img');
+        heroSources = collectHeroSources(parsedDoc, response.url || worksUrl);
       } catch (err) {
-        console.warn('Hero banner: could not load artwork from index.html.', err);
+        console.warn('Hero banner: could not load artwork from the Works page.', err);
         return;
       }
     }
 
-    const latestFive = Array.from(sourceThumbnails).slice(0, 5);
+    const latestFive = heroSources.slice(0, 5);
     if (latestFive.length === 0) return;
 
-    latestFive.forEach((sourceImg, i) => {
+    latestFive.forEach((source, i) => {
       const slide = document.createElement('img');
-      slide.src = sourceImg.getAttribute('src');
-      slide.alt = sourceImg.getAttribute('alt') || 'Featured artwork';
+      slide.src = source.src;
+      slide.alt = source.alt;
       slide.className = 'slide' + (i === 0 ? ' active' : '');
       heroContainer.appendChild(slide);
 
       if (slide.complete) {
-        applyFocalPoint(slide, sourceImg);
+        applyFocalPoint(slide, source.focus);
       } else {
-        slide.addEventListener('load', () => applyFocalPoint(slide, sourceImg), { once: true });
+        slide.addEventListener('load', () => applyFocalPoint(slide, source.focus), { once: true });
       }
     });
 
