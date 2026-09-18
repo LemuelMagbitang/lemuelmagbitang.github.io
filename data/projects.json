@@ -395,6 +395,29 @@
     ]
   },
   {
+    "id": "test",
+    "title": "TEST",
+    "subtitle": "TEST",
+    "badge": "3D Design",
+    "filters": [
+      "3d-motion"
+    ],
+    "description": "TEST",
+    "thumbnail": {
+      "src": "",
+      "focus": "50% 50%",
+      "zoom": 1
+    },
+    "media": [
+      {
+        "type": "image",
+        "src": "assets\\projects\\aol\\combination.jpg",
+        "caption": "",
+        "orientation": ""
+      }
+    ]
+  },
+  {
     "id": "graphic-design",
     "title": "Commercial & Graphic Design",
     "subtitle": "Key Visuals & Editorial Layouts",
@@ -484,29 +507,6 @@
         "type": "image",
         "src": "assets/projects/personal-illustrations/genshin-2d-illustrations/columbina-illustration.jpg",
         "caption": "Style Study of Genshin Impact Character \"Columbina\"",
-        "orientation": ""
-      }
-    ]
-  },
-  {
-    "id": "test",
-    "title": "TEST",
-    "subtitle": "TEST",
-    "badge": "3D Design",
-    "filters": [
-      "3d-motion"
-    ],
-    "description": "TEST",
-    "thumbnail": {
-      "src": "",
-      "focus": "50% 50%",
-      "zoom": 1
-    },
-    "media": [
-      {
-        "type": "image",
-        "src": "assets\\projects\\aol\\combination.jpg",
-        "caption": "",
         "orientation": ""
       }
     ]
