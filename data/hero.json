@@ -91,10 +91,10 @@
     "weight": 0.3
   },
   {
-    "label": "",
+    "label": "Client",
     "text": "\"I like it, but I don't like it.\"",
-    "author": "Client",
-    "source": "Content updates dynamically.",
+    "author": "Content updates dynamically.",
+    "source": "",
     "weight": 0.3
   }
 ]
