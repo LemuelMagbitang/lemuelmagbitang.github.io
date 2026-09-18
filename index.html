@@ -38,6 +38,15 @@
 
   <link rel="icon" type="image/svg+xml" href="assets/projects/site/favicon.png">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Site typeface: loaded directly instead of relying on whatever
+       system font a visitor's OS/browser happens to substitute (this is
+       what previously showed up wrong on Android/Windows). Preconnect
+       first for a faster first paint. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -77,28 +86,19 @@
 </nav>
 
   <!-- HERO SECTION -->
-  <header class="hero-section">
-    <!-- Do NOT put images here by hand anymore.
-         script.js automatically fills this with your 5 most recent
-         project thumbnails from the grid below. To change what shows
-         up in the hero, just reorder or add project cards below —
-         whichever 5 cards are FIRST in the grid are used. -->
-    <div class="hero-banner" id="heroBanner"></div>
-    
-    <div class="hero-overlay">
-      <span class="subtext-header">Multimedia Artist</span>
-      <h1 class="name">LEMUEL MAGBITANG</h1>
-      <div class="tagline">
-        Visual Designer &amp; Motion Specialist <span class="status-dot"></span> Freelance Open for Work
-      </div>
-      <div class="social-icons">
-        <a href="https://www.instagram.com/llem_09" target="_blank" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-        <a href="https://www.tiktok.com/@artsoflem" target="_blank" aria-label="TikTok"><i class="fa-brands fa-tiktok"></i></a>
-        <a href="https://youtube.com/@aol_lem" target="_blank" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
-        <a href="mailto:lemuelmagbitangt@gmail.com" aria-label="Email"><i class="fa-solid fa-envelope"></i></a>
-      </div>
-    </div>
-  </header>
+  <header class="hero-section hero-section--message">
+  <!-- Rotating artwork backdrop — unchanged, still auto-filled by script.js -->
+  <div class="hero-banner" id="heroBanner"></div>
+ 
+  <div class="hero-overlay quote-overlay">
+    <!-- Intentionally empty. script.js builds the label, statement
+         and credit line inside here on page load, then fades the
+         block in. Don't type text in here — edit HERO_MESSAGES in
+         js/script.js instead, or you'll end up with two versions
+         of the same line that disagree with each other. -->
+    <div class="hero-quote" id="heroQuote"></div>
+  </div>
+</header>
 
   <!-- MAIN WORKS SECTION -->
   <main class="container page-spacing">
@@ -253,8 +253,8 @@
             <p>Retail Environment &amp; Pop-Up Kiosk Design</p>
           </div>
           <div class="project-description" style="display: none;">
-            <p>A collection of commercial 3D spatial layouts and pop-up retail environments, including the H2OH concept
-              store, the Little Sprinkle and Sparkle kiosk, and the Repluxe commercial block layout. Built in Blender,
+            <p>A collection of commercial 3D spatial layouts and pop-up retail environments, including concept
+              stores, kiosk Store, and a commercial block layout. Built in Blender,
               with a focus on translating brand identity into believable, walkable retail space.</p>
           </div>
           <div class="project-media-list" style="display: none;">
@@ -290,7 +290,7 @@
             <p>Commercial Product Rendering &amp; Structural Packaging</p>
           </div>
           <div class="project-description" style="display: none;">
-            <p>High-fidelity product and packaging visualizations, from the Aureus shampoo line to a structural wine
+            <p>High-fidelity product and packaging visualizations, form a conceptual shampoo line to a structural wine
               box concept. Built in Blender, with an emphasis on material realism — glass, liquid, foil, and
               cardboard rendered to commercial print/advertising standard.</p>
           </div>
@@ -329,8 +329,6 @@
             data-description="Temporal Constraints"></div>
             <div class="media-item" data-image="assets\projects\ephiphany-3d-illustration\melodies-of-innerself.jpg"
             data-description="Melodies of the Inner Self"></div>
-            <div class="media-item" data-image="assets\projects\ephiphany-3d-illustration\aqua-vitae.jpg"
-            data-description="Aqua Vitae"></div>
             <div class="media-item" data-image="assets\projects\ephiphany-3d-illustration\aqua-vitae.jpg"
             data-description="Aqua Vitae"></div>
             <div class="media-item" data-image="assets\projects\ephiphany-3d-illustration\the-dead-king-midas.jpg"
@@ -423,7 +421,7 @@
           </div>
           <div class="project-description" style="display: none;">
             <p>A collection of commercial design and promotional print assets created for various brand campaigns,
-              conceptual projects, and marketing initiatives. Demonstrates expertise in visual storytelling,
+              conceptual projects, and marketing initiatives. Demonstrates visual storytelling,
               product layout design, and targeted advertising graphics. </p>
           </div>
           <div class="project-media-list" style="display: none;">
@@ -629,6 +627,11 @@
     </div>
   </footer>
 
+  <!-- CMS HOOK — points the hero at data/hero.json (edited via admin.html).
+       script.js keeps the HERO_MESSAGES array above as its offline
+       fallback, so the hero is never empty if this file is missing or
+       you're previewing from file://. -->
+  <script>window.HERO_MESSAGES_URL = 'data/hero.json';</script>
   <script src="js/script.js"></script>
 </body>
 </html>
