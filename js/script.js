@@ -233,6 +233,63 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
   /* =========================================
+     0c. CMS OVERRIDE — REVIEWS
+     ========================================= */
+  /* Same reasoning as projects: buildReviewsMarquee() (section 6,
+     further down) captures whatever's inside #reviewsTrack the first
+     time it runs and treats that as the permanent "pristine" set it
+     duplicates to build the scrolling loop. If the CMS cards weren't
+     in the DOM before that first run, they'd never make it into the
+     loop — so, same as projects, this is awaited up front rather than
+     fired in the background. */
+
+  function buildReviewCardEl(r) {
+    const card = document.createElement('div');
+    card.className = 'review-card';
+
+    const stars = document.createElement('div');
+    stars.className = 'review-stars';
+    const filled = Math.max(0, Math.min(5, Math.round(Number(r.stars) || 0)));
+    stars.textContent = '★'.repeat(filled) + '☆'.repeat(5 - filled);
+
+    const quote = document.createElement('p');
+    quote.className = 'review-quote';
+    quote.textContent = '"' + (r.quote || '') + '"';
+
+    const author = document.createElement('span');
+    author.className = 'review-author';
+    author.textContent = '— ' + (r.author || '');
+
+    card.appendChild(stars);
+    card.appendChild(quote);
+    card.appendChild(author);
+    return card;
+  }
+
+  async function loadReviewsFromCMS() {
+    if (!window.REVIEWS_URL) return;
+    const track = document.getElementById('reviewsTrack');
+    if (!track) return;
+
+    try {
+      const res = await fetch(window.REVIEWS_URL);
+      if (!res.ok) return;
+      const list = await res.json();
+      if (!Array.isArray(list) || !list.length) return;
+
+      const frag = document.createDocumentFragment();
+      list.forEach(r => frag.appendChild(buildReviewCardEl(r)));
+      track.innerHTML = '';
+      track.appendChild(frag);
+    } catch (err) {
+      console.warn('Reviews: could not load', window.REVIEWS_URL, err);
+      // Leave the existing static cards in place.
+    }
+  }
+  await loadReviewsFromCMS();
+
+
+  /* =========================================
      0b. HOMEPAGE HERO — MESSAGES
      ========================================= */
   /* ---------------------------------------------------------------
