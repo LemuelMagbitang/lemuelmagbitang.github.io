@@ -93,8 +93,8 @@
   {
     "label": "",
     "text": "\"I like it, but I don't like it.\"",
-    "author": "Content updates dynamically.",
-    "source": "",
+    "author": "Client",
+    "source": "Content updates dynamically.",
     "weight": 0.3
   }
 ]
