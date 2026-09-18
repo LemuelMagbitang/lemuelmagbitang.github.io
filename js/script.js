@@ -31,6 +31,273 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* =========================================
+     0b. HOMEPAGE HERO — MESSAGES
+     ========================================= */
+  /* ---------------------------------------------------------------
+     THIS IS THE ONLY PART YOU EDIT TO CHANGE THE HERO TEXT.
+
+     It doesn't have to be a quote any more. Each entry can be a
+     quote, a short message, a mission statement, a one-line story —
+     anything you want on the front page.
+
+     Every field except `text` is optional. Leave one out (or set it
+     to '') and that line simply isn't rendered:
+
+       label  — the small tracked, uppercase line above the text.
+                Use it as a category: ON DESIGN / NOTE / CURRENTLY.
+       text   — the main statement. Add the “ ” yourself if you want
+                it to read as a quotation; leave them off for your
+                own writing.
+       author — plain text only, no links.
+       source — book / publication / where it's from, plain text.
+
+     TO ADD A NEW ONE: copy any block below, paste it inside the
+     array, change the words. That's it — no HTML, no CSS to touch.
+     They're picked at random on every page load (see below), so a
+     new entry is in rotation immediately.
+     --------------------------------------------------------------- */
+  const HERO_MESSAGES = [
+    {
+      label: 'On design',
+      text: '“Design is really an act of communication, which means having a deep understanding of the person with whom the designer is communicating.”',
+      author: 'Donald A. Norman',
+      source: 'The Design of Everyday Things'
+    },
+    {
+      label: 'On design',
+      text: '“Good design is actually a lot harder to notice than poor design, in part because good designs fit our needs so well that the design is invisible.”',
+      author: 'Donald A. Norman',
+      source: 'The Design of Everyday Things'
+    },
+    {
+      label: 'Currently',
+      text: 'Building visual systems that hold up — in 2D, in 3D, and in motion.',
+      author: 'LM.'
+    },
+    {
+      label: 'Approach',
+      text: 'Every frame is a decision. I try to make sure each one is deliberate.',
+      author: 'LM.'
+    },
+    {
+      // Text only — no label, no author, no source. This is a valid
+      // entry: the label line and the credit line (with its hairline
+      // rule) simply aren't drawn, and the statement sits alone.
+      // Leaving a field out entirely and setting it to '' do exactly
+      // the same thing, so use whichever reads better to you.
+      text: 'Open for freelance work.'
+    }
+  ];
+
+  /* ---------------------------------------------------------------
+     CMS HOOK — you won't need this until you build the CMS tool.
+
+     When that day comes, the CMS only has to drop a global array on
+     the page BEFORE script.js runs, in exactly the same shape as
+     HERO_MESSAGES above:
+
+       <script>
+         window.HERO_MESSAGES = [
+           { label: '...', text: '...', author: '...', source: '...' }
+         ];
+       </script>
+
+     …or, if the CMS writes a JSON file, set window.HERO_MESSAGES_URL
+     to it (e.g. 'data/hero-messages.json') and this will fetch it and
+     swap the text in once it arrives. Either way the array baked in
+     above stays as the offline/fallback copy, so the hero is never
+     empty if the CMS is down or you're previewing from file://.
+     --------------------------------------------------------------- */
+
+  /* HOW LONG A MESSAGE CAN BE.
+
+     The hero now sizes itself to whatever text is in it — a short
+     line gives a short hero, a long one gives a taller hero. This is
+     the ceiling that stops it from ever growing into a wall of type
+     you have to scroll past before reaching the work.
+
+     180 characters is roughly six lines at the largest desktop size,
+     which lands just under the old fixed hero height. That old height
+     is now the maximum rather than the fixed size, exactly as asked.
+
+     If you go over: the message is trimmed at the last whole word and
+     given an ellipsis, and a warning naming the entry is printed to
+     the browser console (F12 → Console) so you know it happened
+     rather than quietly shipping a cut-off sentence. Raise the number
+     if you want longer messages — just check the hero on a phone
+     afterwards, since that's where a long one bites first. */
+  const HERO_MAX_CHARS = 180;
+
+  // Timed crossfade is OFF by default: you asked for the text to
+  // change on refresh only, so each visit / new tab is one message,
+  // held. Set this to a number of milliseconds (e.g. 7000) if you
+  // ever want it to cycle on a timer again instead.
+  const HERO_AUTO_ROTATE_MS = 0;
+
+  const HERO_FADE_MS = 600; // must match the CSS transition on .hero-quote-text
+
+  function getHeroMessages() {
+    const fromCms = window.HERO_MESSAGES;
+    if (Array.isArray(fromCms) && fromCms.length) return fromCms;
+    return HERO_MESSAGES;
+  }
+
+  // Enforces HERO_MAX_CHARS. Applies to whatever list is in use, so a
+  // future CMS gets the same protection without any extra work.
+  function capHeroText(raw, i) {
+    const text = String(raw || '');
+    if (text.length <= HERO_MAX_CHARS) return text;
+
+    const cut = text.slice(0, HERO_MAX_CHARS);
+    const lastSpace = cut.lastIndexOf(' ');
+    const trimmed = (lastSpace > 40 ? cut.slice(0, lastSpace) : cut).replace(/[\s,;:.\u2014-]+$/, '');
+
+    console.warn(
+      'Hero message #' + i + ' is ' + text.length + ' characters, over the ' +
+      HERO_MAX_CHARS + '-character limit, so it was shortened. ' +
+      'Edit HERO_MESSAGES in script.js, or raise HERO_MAX_CHARS.'
+    );
+    return trimmed + '\u2026';
+  }
+
+  /* Picks a random entry, weighted by each message's optional `weight`
+     field (set from the CMS). 1 = normal odds; higher = shows more
+     often; lower (e.g. 0.2) = a rare easter egg. Missing/invalid
+     weights default to 1, so old data without the field behaves
+     exactly as before. Also deliberately avoids repeating the one
+     shown last time where another non-zero-weight option exists. The
+     last index is remembered in localStorage, which is shared across
+     tabs of the same site — so opening a second tab reliably gives
+     you a different message instead of rolling the same number twice
+     in a row. */
+  function pickHeroIndex(messages, exclude) {
+    const total = messages.length;
+    if (total <= 1) return 0;
+
+    const weights = messages.map(m => {
+      const w = m && typeof m.weight === 'number' && isFinite(m.weight) && m.weight >= 0 ? m.weight : 1;
+      return w;
+    });
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+    function weightedPick() {
+      if (totalWeight <= 0) return Math.floor(Math.random() * total);
+      let r = Math.random() * totalWeight;
+      for (let idx = 0; idx < total; idx++) {
+        r -= weights[idx];
+        if (r <= 0) return idx;
+      }
+      return total - 1;
+    }
+
+    let i = weightedPick();
+    const hasAlternative = weights.some((w, idx) => idx !== exclude && w > 0);
+    if (i === exclude && hasAlternative) {
+      let tries = 0;
+      while (i === exclude && tries < 10) { i = weightedPick(); tries++; }
+    }
+    return i;
+  }
+
+  function readLastHeroIndex() {
+    try {
+      const raw = window.localStorage.getItem('lm:lastHeroMessage');
+      return raw === null ? -1 : parseInt(raw, 10);
+    } catch (err) {
+      return -1; // private mode / storage blocked — just go fully random
+    }
+  }
+
+  function rememberHeroIndex(i) {
+    try { window.localStorage.setItem('lm:lastHeroMessage', String(i)); } catch (err) { /* ignore */ }
+  }
+
+  function initHeroMessage() {
+    const root = document.getElementById('heroQuote') || document.querySelector('.hero-quote');
+    if (!root) return; // this page has no hero message block
+
+    // The three lines are created here if they aren't already in the
+    // HTML, so index.html only needs the empty <div class="hero-quote">
+    // wrapper and nothing can fall out of sync between the two files.
+    function ensure(id, cls, tag) {
+      let el = document.getElementById(id) || root.querySelector('.' + cls);
+      if (!el) {
+        el = document.createElement(tag);
+        el.id = id;
+        el.className = cls;
+        root.appendChild(el);
+      }
+      return el;
+    }
+
+    const labelEl = ensure('heroQuoteLabel', 'hero-quote-label', 'span');
+    const textEl = ensure('heroQuoteText', 'hero-quote-text', 'p');
+    const authorEl = ensure('heroQuoteAuthor', 'hero-quote-author', 'span');
+
+    // Keeps the DOM order right even if the wrapper already had some
+    // of these in a different order.
+    root.appendChild(labelEl);
+    root.appendChild(textEl);
+    root.appendChild(authorEl);
+
+    let messages = getHeroMessages();
+    let current = -1;
+
+    function render(i) {
+      const item = messages[i] || {};
+      current = i;
+
+      // textContent everywhere, never innerHTML — the author line is
+      // plain text now (no book link), and this also means a future
+      // CMS can't accidentally inject markup into the page.
+      labelEl.textContent = item.label || '';
+      labelEl.style.display = item.label ? '' : 'none';
+
+      textEl.textContent = capHeroText(item.text, i);
+
+      const credit = [item.author, item.source].filter(Boolean).join(', ');
+      authorEl.textContent = credit ? '— ' + credit : '';
+      authorEl.style.display = credit ? '' : 'none';
+
+      root.classList.add('is-ready');
+    }
+
+    function fadeTo(i) {
+      root.style.opacity = '0';
+      setTimeout(() => {
+        render(i);
+        rememberHeroIndex(i);
+        root.style.opacity = '1';
+      }, HERO_FADE_MS);
+    }
+
+    // One random pick per page load — this is the "different every
+    // time you refresh / open a new tab" behaviour.
+    const first = pickHeroIndex(messages, readLastHeroIndex());
+    render(first);
+    rememberHeroIndex(first);
+
+    if (HERO_AUTO_ROTATE_MS > 0) {
+      setInterval(() => fadeTo(pickHeroIndex(messages, current)), HERO_AUTO_ROTATE_MS + HERO_FADE_MS);
+    }
+
+    // If the CMS points at a JSON file, load it and re-pick from the
+    // fresh list once it lands.
+    if (window.HERO_MESSAGES_URL) {
+      fetch(window.HERO_MESSAGES_URL)
+        .then(r => r.json())
+        .then(list => {
+          if (!Array.isArray(list) || !list.length) return;
+          messages = list;
+          fadeTo(pickHeroIndex(messages, -1));
+        })
+        .catch(err => console.warn('Hero messages: could not load', window.HERO_MESSAGES_URL, err));
+    }
+  }
+  initHeroMessage();
+
+
+  /* =========================================
      1. PROJECT CARD SETUP (badges + fallback thumbnails)
      ========================================= */
   // Hides every badge pill if you've switched them off above.
