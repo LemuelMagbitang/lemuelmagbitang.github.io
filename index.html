@@ -627,14 +627,16 @@
     </div>
   </footer>
 
-  <!-- CMS HOOK — points the hero at data/hero.json, and site-wide
-       toggles/forms/socials/contact-email at data/settings.json (both
-       edited via admin.html). script.js keeps its hardcoded values as
-       an offline fallback, so nothing on the page is ever blank if
-       these files are missing or you're previewing from file://. -->
+  <!-- CMS HOOK — points the hero at data/hero.json, site-wide
+       toggles/forms/socials/contact-email at data/settings.json, and
+       the whole project grid at data/projects.json (all edited via
+       admin.html). script.js keeps its hardcoded values/cards as an
+       offline fallback, so nothing on the page is ever blank if these
+       files are missing or you're previewing from file://. -->
   <script>
     window.HERO_MESSAGES_URL = 'data/hero.json';
     window.SETTINGS_URL = 'data/settings.json';
+    window.PROJECTS_URL = 'data/projects.json';
   </script>
   <script src="js/script.js"></script>
 </body>

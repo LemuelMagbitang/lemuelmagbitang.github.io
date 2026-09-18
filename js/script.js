@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
 
   /* =========================================
      0. YOUR SWITCHES — edit these two, nothing else
@@ -111,6 +111,125 @@ document.addEventListener('DOMContentLoaded', () => {
       .then(applySettings)
       .catch(err => console.warn('Settings: could not load', window.SETTINGS_URL, err));
   }
+
+
+  /* =========================================
+     0b. CMS OVERRIDE — PROJECTS
+     ========================================= */
+  /* If window.PROJECTS_URL points at data/projects.json, fetch it and,
+     when it returns a non-empty array, rebuild #portfolioGrid entirely
+     from that data. This has to happen — and finish — before anything
+     further down reads the grid: filtering, the hero banner's "5
+     latest artworks", and the lightbox click handlers each capture
+     the grid's cards once, early, into a fixed list. That's why this
+     is awaited before section 1 below, instead of firing in the
+     background the way hero text and settings do.
+
+     If the fetch fails, is empty, or window.PROJECTS_URL isn't set,
+     the static cards already written in this file are left exactly
+     as they are — that's the fallback, not an error state. */
+
+  function buildMediaItemEl(m) {
+    const el = document.createElement('div');
+    el.className = 'media-item';
+    if (m.type === 'video') el.setAttribute('data-video', m.src || '');
+    else if (m.type === 'youtube') el.setAttribute('data-youtube', m.src || '');
+    else el.setAttribute('data-image', m.src || '');
+    if (m.caption) el.setAttribute('data-description', m.caption);
+    if (m.orientation) el.setAttribute('data-orientation', m.orientation);
+    return el;
+  }
+
+  function buildProjectCardEl(p) {
+    const card = document.createElement('div');
+    const filters = Array.isArray(p.filters) ? p.filters.filter(Boolean) : [];
+    card.className = ['project-card', ...filters].join(' ');
+
+    if (p.badge) {
+      const badges = document.createElement('div');
+      badges.className = 'card-badges';
+      const span = document.createElement('span');
+      span.className = 'badge glass';
+      span.textContent = p.badge;
+      badges.appendChild(span);
+      card.appendChild(badges);
+    }
+
+    const thumb = document.createElement('div');
+    thumb.className = 'card-thumbnail';
+    const t = p.thumbnail || {};
+    if (t.src) {
+      // A real thumbnail image: focus/zoom go on the <img> itself,
+      // matching the convention already used in the static markup.
+      const img = document.createElement('img');
+      img.src = t.src;
+      img.alt = p.title || 'Project artwork';
+      if (t.focus) img.setAttribute('data-focus', t.focus);
+      if (t.zoom && Number(t.zoom) !== 1) img.setAttribute('data-zoom', t.zoom);
+      thumb.appendChild(img);
+    } else {
+      // No thumbnail set — leave it empty so fillMissingThumbnails()
+      // (section 1, right after this) fills it from the first media
+      // item, same as the static markup does. Focus/zoom go on the
+      // wrapper itself since there's no <img> yet to put them on.
+      if (t.focus) thumb.setAttribute('data-focus', t.focus);
+      if (t.zoom && Number(t.zoom) !== 1) thumb.setAttribute('data-zoom', t.zoom);
+    }
+    card.appendChild(thumb);
+
+    const info = document.createElement('div');
+    info.className = 'glass-info';
+    const h3 = document.createElement('h3');
+    h3.textContent = p.title || '';
+    const subtitleP = document.createElement('p');
+    subtitleP.textContent = p.subtitle || '';
+    info.appendChild(h3);
+    info.appendChild(subtitleP);
+    card.appendChild(info);
+
+    if (p.description) {
+      const descWrap = document.createElement('div');
+      descWrap.className = 'project-description';
+      descWrap.style.display = 'none';
+      const descP = document.createElement('p');
+      descP.textContent = p.description;
+      descWrap.appendChild(descP);
+      card.appendChild(descWrap);
+    }
+
+    const mediaList = document.createElement('div');
+    mediaList.className = 'project-media-list';
+    mediaList.style.display = 'none';
+    (Array.isArray(p.media) ? p.media : []).forEach(m => {
+      if (!m || !m.src) return;
+      mediaList.appendChild(buildMediaItemEl(m));
+    });
+    card.appendChild(mediaList);
+
+    return card;
+  }
+
+  async function loadProjectsFromCMS() {
+    if (!window.PROJECTS_URL) return;
+    const grid = document.getElementById('portfolioGrid');
+    if (!grid) return;
+
+    try {
+      const res = await fetch(window.PROJECTS_URL);
+      if (!res.ok) return;
+      const list = await res.json();
+      if (!Array.isArray(list) || !list.length) return;
+
+      const frag = document.createDocumentFragment();
+      list.forEach(p => frag.appendChild(buildProjectCardEl(p)));
+      grid.innerHTML = '';
+      grid.appendChild(frag);
+    } catch (err) {
+      console.warn('Projects: could not load', window.PROJECTS_URL, err);
+      // Leave the existing static cards in place.
+    }
+  }
+  await loadProjectsFromCMS();
 
 
   /* =========================================
