@@ -411,12 +411,6 @@
     "media": [
       {
         "type": "image",
-        "src": "assets\\projects\\aol\\combination.jpg",
-        "caption": "",
-        "orientation": ""
-      },
-      {
-        "type": "image",
         "src": "assets\\projects\\aol\\figureground.jpg",
         "caption": "",
         "orientation": ""
@@ -424,6 +418,12 @@
       {
         "type": "image",
         "src": "assets\\projects\\aol\\continuity.jpg",
+        "caption": "",
+        "orientation": ""
+      },
+      {
+        "type": "image",
+        "src": "assets\\projects\\aol\\combination.jpg",
         "caption": "",
         "orientation": ""
       },
