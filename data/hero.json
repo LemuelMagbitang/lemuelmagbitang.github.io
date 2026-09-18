@@ -15,7 +15,7 @@
   },
   {
     "label": "",
-    "text": "Building visual systems that hold up — in 2D, in 3D, and in motion.",
+    "text": "Working with Creative Freedom.",
     "author": "LM.",
     "source": "",
     "weight": 1
@@ -40,5 +40,33 @@
     "author": "Content updates dynamically.",
     "source": "",
     "weight": 0.2
+  },
+  {
+    "label": "",
+    "text": "I make ART because life is beautiful.",
+    "author": "LM.",
+    "source": "",
+    "weight": 1
+  },
+  {
+    "label": "",
+    "text": "Transforming the beauty of your vision into functional design, dynamic motion, and unforgettable branding.",
+    "author": "LM",
+    "source": "",
+    "weight": 1
+  },
+  {
+    "label": "",
+    "text": "The best things you will come across in your art journey are friends.",
+    "author": "LM.",
+    "source": "",
+    "weight": 0.5
+  },
+  {
+    "label": "",
+    "text": "100% Made with Love",
+    "author": "Content updates dynamically.",
+    "source": "",
+    "weight": 0.8
   }
 ]
