@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Right-click / "Save Image As" protection on lightbox artworks.
   // true  = right-click and drag-to-save are disabled on artworks.
   // false = artworks behave like normal images.
-  const PROTECTION_ENABLED = true;
+  let PROTECTION_ENABLED = true;
 
   // Web3Forms has a monthly response limit on the free plan. Flip
   // either of these to false when you're close to it (or just want
@@ -22,12 +22,95 @@ document.addEventListener('DOMContentLoaded', () => {
   // Shows/hides the little "2D" / "3D" / "Motion" pill(s) in the
   // top-left corner of every project card. Doesn't affect filtering —
   // that still works off the card's classes either way.
-  const SHOW_CARD_BADGES = true;
+  let SHOW_CARD_BADGES = true;
 
   // Shows/hides the whole client reviews section (the scrolling wall of
   // review cards above the footer). Set to false if you don't have
   // enough reviews yet, or just want it off the page for a while.
-  const SHOW_REVIEWS = false;
+  let SHOW_REVIEWS = false;
+
+
+  /* =========================================
+     0a. CMS OVERRIDE — SETTINGS
+     ========================================= */
+  /* If window.SETTINGS_URL points at data/settings.json, fetch it and
+     apply whatever it contains on top of the hardcoded defaults above.
+     Same pattern as the hero messages: the page renders instantly
+     using the defaults, then quietly updates the moment the fetch
+     resolves — so a slow or failed fetch never blocks or breaks
+     anything, it just leaves the defaults in place. */
+  const socialLabels = { instagram: 'Instagram', tiktok: 'TikTok', youtube: 'YouTube' };
+
+  function setHiddenField(formId, fieldName, value) {
+    if (value === undefined || value === null || value === '') return;
+    const form = document.getElementById(formId);
+    if (!form) return;
+    const input = form.querySelector('input[name="' + fieldName + '"]');
+    if (input) input.value = value;
+  }
+
+  function setSocialHref(key, url) {
+    if (!url) return;
+    const label = socialLabels[key];
+    document.querySelectorAll('a[aria-label="' + label + '"]').forEach(a => { a.href = url; });
+  }
+
+  function applyCardBadgesVisibility() {
+    document.querySelectorAll('.card-badges').forEach(el => {
+      el.style.display = SHOW_CARD_BADGES ? '' : 'none';
+    });
+  }
+
+  function applySettings(remote) {
+    if (!remote || typeof remote !== 'object') return;
+
+    if (typeof remote.protectionEnabled === 'boolean') PROTECTION_ENABLED = remote.protectionEnabled;
+    if (remote.formsEnabled) {
+      if (typeof remote.formsEnabled.project === 'boolean') FORMS_ENABLED.project = remote.formsEnabled.project;
+      if (typeof remote.formsEnabled.review === 'boolean') FORMS_ENABLED.review = remote.formsEnabled.review;
+    }
+    if (typeof remote.showCardBadges === 'boolean') SHOW_CARD_BADGES = remote.showCardBadges;
+    if (typeof remote.showReviews === 'boolean') SHOW_REVIEWS = remote.showReviews;
+
+    // Re-apply every toggle-dependent bit of DOM now that the values
+    // may have changed. PROTECTION_ENABLED needs no re-apply here — it's
+    // read live wherever lightbox media gets built, further down.
+    applyCardBadgesVisibility();
+    applyFormToggle(document.getElementById('projectForm'), document.getElementById('projectEmailBtn'), FORMS_ENABLED.project);
+    applyFormToggle(document.getElementById('reviewForm'), document.getElementById('reviewEmailBtn'), FORMS_ENABLED.review);
+    applyReviewsVisibility();
+
+    if (remote.web3forms) {
+      setHiddenField('projectForm', 'apikey', remote.web3forms.projectKey);
+      setHiddenField('reviewForm', 'apikey', remote.web3forms.reviewKey);
+    }
+    if (remote.redirectUrl) {
+      setHiddenField('projectForm', 'redirect', remote.redirectUrl);
+      setHiddenField('reviewForm', 'redirect', remote.redirectUrl);
+    }
+
+    if (remote.contactEmail) {
+      document.querySelectorAll('a[href^="mailto:"]').forEach(a => {
+        const query = a.getAttribute('href').split('?')[1];
+        a.href = 'mailto:' + remote.contactEmail + (query ? '?' + query : '');
+      });
+    }
+
+    if (remote.socials) {
+      setSocialHref('instagram', remote.socials.instagram);
+      setSocialHref('tiktok', remote.socials.tiktok);
+      setSocialHref('youtube', remote.socials.youtube);
+    }
+
+    if (remote.siteTitle) document.title = remote.siteTitle;
+  }
+
+  if (window.SETTINGS_URL) {
+    fetch(window.SETTINGS_URL)
+      .then(r => r.json())
+      .then(applySettings)
+      .catch(err => console.warn('Settings: could not load', window.SETTINGS_URL, err));
+  }
 
 
   /* =========================================
@@ -301,11 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
      1. PROJECT CARD SETUP (badges + fallback thumbnails)
      ========================================= */
   // Hides every badge pill if you've switched them off above.
-  if (!SHOW_CARD_BADGES) {
-    document.querySelectorAll('.card-badges').forEach(el => {
-      el.style.display = 'none';
-    });
-  }
+  applyCardBadgesVisibility();
 
   // If a project card's <div class="card-thumbnail"> was left empty
   // (no <img> inside, or an <img> with no src) this fills it in using
@@ -818,9 +897,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let pristineTopCards = null;
   let pristineBottomCards = null;
 
-  if (!SHOW_REVIEWS) {
-    if (reviewsSection) reviewsSection.style.display = 'none';
-  }
+  // Visibility (and the initial marquee build, if on) is handled by
+  // applyReviewsVisibility() below, once buildReviewsMarquee exists.
 
   function buildReviewsMarquee() {
     if (!SHOW_REVIEWS) return;
@@ -866,7 +944,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  buildReviewsMarquee();
+  function applyReviewsVisibility() {
+    if (reviewsSection) reviewsSection.style.display = SHOW_REVIEWS ? '' : 'none';
+    if (SHOW_REVIEWS) buildReviewsMarquee();
+  }
+  applyReviewsVisibility();
 
   let reviewsResizeTimeout;
   window.addEventListener('resize', () => {

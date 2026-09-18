@@ -627,11 +627,15 @@
     </div>
   </footer>
 
-  <!-- CMS HOOK — points the hero at data/hero.json (edited via admin.html).
-       script.js keeps the HERO_MESSAGES array above as its offline
-       fallback, so the hero is never empty if this file is missing or
-       you're previewing from file://. -->
-  <script>window.HERO_MESSAGES_URL = 'data/hero.json';</script>
+  <!-- CMS HOOK — points the hero at data/hero.json, and site-wide
+       toggles/forms/socials/contact-email at data/settings.json (both
+       edited via admin.html). script.js keeps its hardcoded values as
+       an offline fallback, so nothing on the page is ever blank if
+       these files are missing or you're previewing from file://. -->
+  <script>
+    window.HERO_MESSAGES_URL = 'data/hero.json';
+    window.SETTINGS_URL = 'data/settings.json';
+  </script>
   <script src="js/script.js"></script>
 </body>
 </html>
