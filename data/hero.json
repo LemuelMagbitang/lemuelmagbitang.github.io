@@ -39,7 +39,7 @@
     "text": "IM FULLY USING MY 9,000 HORSEPOWERRR!!!",
     "author": "Content updates dynamically.",
     "source": "",
-    "weight": 0.1
+    "weight": 0.2
   },
   {
     "label": "",
@@ -60,10 +60,10 @@
     "text": "The best things you will come across in your art journey are friends.",
     "author": "LM.",
     "source": "",
-    "weight": 0.5
+    "weight": 0.2
   },
   {
-    "label": "",
+    "label": "LM.",
     "text": "100% Made with Love",
     "author": "Content updates dynamically.",
     "source": "",
@@ -84,8 +84,8 @@
     "weight": 1
   },
   {
-    "label": "The ultimate inspiration is the deadline.",
-    "text": "",
+    "label": "",
+    "text": "The ultimate inspiration is the deadline.",
     "author": "Content updates dynamically.",
     "source": "",
     "weight": 0.3
