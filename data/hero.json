@@ -36,14 +36,14 @@
   },
   {
     "label": "LM.",
-    "text": "IM FULLY USING MY 9,000 HORSEPOWERRR!!!",
+    "text": "\"IM FULLY USING MY 9,000 HORSEPOWERRR!!!\"",
     "author": "Content updates dynamically.",
     "source": "",
     "weight": 0.3
   },
   {
     "label": "",
-    "text": "I make ART because life is beautiful.",
+    "text": "\"I make ART because life is beautiful.\"",
     "author": "LM.",
     "source": "",
     "weight": 1
@@ -57,7 +57,7 @@
   },
   {
     "label": "",
-    "text": "The best things you will come across in your art journey are friends.",
+    "text": "\"The best things you will come across in your art journey are friends.\"",
     "author": "LM.",
     "source": "",
     "weight": 0.2
@@ -71,7 +71,7 @@
   },
   {
     "label": "",
-    "text": "I'm very font of you because you are just my type!",
+    "text": "\"I'm very font of you because you are just my type!\"",
     "author": "Content updates dynamically.",
     "source": "",
     "weight": 0.8
@@ -96,5 +96,12 @@
     "author": "Content updates dynamically.",
     "source": "",
     "weight": 0.3
+  },
+  {
+    "label": "",
+    "text": "\"They say the journey was the reward. I said the real reward was realizing who wasn't worth the trip\"",
+    "author": "Content updates dynamically.",
+    "source": "",
+    "weight": 1
   }
 ]
