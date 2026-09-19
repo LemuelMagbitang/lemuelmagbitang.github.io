@@ -286,4 +286,190 @@
   .media-toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px;}
   .media-toolbar .field{flex:1;min-width:200px;margin-bottom:0;}
   .dropzone{border:1.5px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--text-dim);font-size:13px;margin-bottom:22px;transition:border-color .15s, background .15s;cursor:pointer;}
+  .dropzone.hover{border-color:#fff;background:rgba(255,2     on the input is load-bearing, not decorative: a flex item's
+     default minimum width is its own content's intrinsic width, not
+     0 — so without this, a long path value or placeholder can force
+     the row wider than its container and push the button out (most
+     visible in the Thumbnail panel's two-column layout, where this
+     row lives in a half-width column). Short paths never showed it;
+     long ones always would have. */
+  .browse-row{display:flex;gap:8px;align-items:center;width:100%;}
+  .browse-row input{flex:1 1 auto;min-width:0;width:auto;}
+  .browse-row .icon-btn{flex-shrink:0;}
+  .save-status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:18px;}
+  .panel h3{font-size:.95rem;font-weight:700;color:#fff;margin-bottom:4px;}
+  .panel .panel-sub{font-size:12px;color:var(--text-dim);margin-bottom:18px;}
+
+  .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line-soft);gap:20px;}
+  .toggle-row:last-child{border-bottom:none;}
+  .toggle-row .t-label{font-weight:600;color:#fff;font-size:13.5px;}
+  .toggle-row .t-desc{font-size:12px;color:var(--text-dim);margin-top:3px;}
+
+  .card-item{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:9px;padding:18px;margin-bottom:12px;}
+  .card-item-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;}
+  .card-item-head .drag-handle{color:#555;font-size:13px;cursor:grab;padding:4px 6px;}
+  .card-item-head .item-title{font-size:12.5px;font-weight:700;color:#ddd;flex:1;}
+  .card-item-actions{display:flex;gap:6px;}
+  .add-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;border:1.5px dashed var(--line);border-radius:9px;background:transparent;color:var(--text-dim);font-weight:600;font-size:13px;}
+  .add-btn:hover{border-color:rgba(255,255,255,.35);color:#fff;}
+
+  .charcount{font-size:11px;color:var(--text-dim);text-align:right;margin-top:4px;}
+  .charcount.over{color:var(--danger);font-weight:700;}
+
+  .tagbox{display:flex;flex-wrap:wrap;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px;background:#0f0f0f;}
+  .tag-pill{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border:1px solid var(--line);padding:5px 10px 5px 12px;border-radius:20px;font-size:12.5px;color:#eee;}
+  .tag-pill button{background:none;border:none;color:#888;font-size:11px;}
+  .tag-pill button:hover{color:#fff;}
+  /* Software Skills' variant of .tag-pill: adds a small logo swatch
+     before the name. Clicking the swatch opens the media picker to
+     set/change a logo; a skill with no logo shows a faint placeholder
+     square instead, so there's always something to click. */
+  .skill-pill{padding-left:5px;}
+  .skill-pill-icon{width:22px;height:22px;border-radius:5px;background:#0a0a0a;border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;flex-shrink:0;}
+  .skill-pill-icon:hover{border-color:rgba(255,255,255,.3);}
+  .skill-pill-icon img{width:100%;height:100%;object-fit:contain;}
+  .skill-pill-icon i{font-size:10px;color:#555;}
+  .skill-pill-name{white-space:nowrap;}
+  .skill-pill .clear-icon-btn{color:#e0584f!important;font-size:10px!important;}
+  .tagbox input{border:none;background:none;flex:1;min-width:120px;padding:5px;}
+
+  .chip-select{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{padding:7px 13px;border:1px solid var(--line);border-radius:20px;font-size:12.5px;font-weight:600;color:var(--text-dim);background:transparent;}
+  .chip.selected{color:#111;background:#fff;border-color:#fff;}
+
+  /* 1/1, not 16/10: a project card on the live site is always a square
+     (.project-card{aspect-ratio:1/1} in style.css) — cropping the focus
+     point in a wide box here meant what you dragged never matched what
+     the card actually showed. */
+  .focus-picker{position:relative;width:100%;max-width:220px;aspect-ratio:1/1;background:#0a0a0a repeating-conic-gradient(#151515 0% 25%,#0a0a0a 0% 50%) 0 0/16px 16px;border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:crosshair;}
+  .focus-picker img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;opacity:.55;}
+  .focus-crosshair{position:absolute;width:16px;height:16px;border:2px solid #fff;border-radius:50%;background:rgba(255,255,255,.15);transform:translate(-50%,-50%);box-shadow:0 0 0 2000px rgba(0,0,0,0);pointer-events:none;}
+  .focus-crosshair:before,.focus-crosshair:after{content:"";position:absolute;background:#fff;}
+  .focus-crosshair:before{left:50%;top:-6px;bottom:-6px;width:1px;transform:translateX(-50%);}
+  .focus-crosshair:after{top:50%;left:-6px;right:-6px;height:1px;transform:translateY(-50%);}
+
+  .stars-input{display:flex;gap:4px;font-size:20px;}
+  .stars-input i{color:#333;cursor:pointer;}
+  .stars-input i.filled{color:#f5c518;}
+
+  .banner{padding:12px 14px;border-radius:8px;font-size:12.5px;margin-bottom:18px;display:flex;gap:10px;align-items:flex-start;}
+  .banner i{margin-top:1px;}
+  .banner.info{background:rgba(255,255,255,.05);border:1px solid var(--line);color:#bbb;}
+  .banner.muted{background:rgba(255,255,255,.03);border:1px solid var(--line-soft);color:var(--text-dim);}
+
+  .loading-row{display:flex;align-items:center;gap:10px;color:var(--text-dim);font-size:13px;padding:40px 0;justify-content:center;}
+  .spin{animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .toast-wrap{position:fixed;bottom:22px;right:22px;display:flex;flex-direction:column;gap:10px;z-index:999;}
+  .toast{background:#1c1c1c;border:1px solid var(--line);border-left:3px solid var(--good);border-radius:8px;padding:12px 16px;font-size:13px;color:#eee;min-width:240px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:toastin .2s ease;}
+  .toast.error{border-left-color:var(--danger);}
+  @keyframes toastin{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+  .subrepeater{border-left:2px solid var(--line-soft);padding-left:16px;margin-top:10px;}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+  /* ---------- Mobile: sidebar becomes a slide-in drawer ---------- */
+  #mobileMenuBtn{display:none;}
+  #sidebarBackdrop{display:none;}
+  @media (max-width:720px){
+    #app.active{display:block;}
+    main.content{padding:24px 18px 60px;}
+    .two-col{grid-template-columns:1fr;}
+
+    /* The sidebar no longer sits in normal document flow next to the
+       content (that's what caused it to render as one long stacked
+       page — nav list, then content, all in a row you had to scroll
+       past). It's now an overlay panel, off-screen by default and
+       slid fully into view over the content when opened, the same
+       pattern Claude's own mobile app uses for its side menu. */
+    aside.sidebar{
+      position:fixed; top:0; left:0; z-index:500;
+      width:82%; max-width:300px; height:100%;
+      transform:translateX(-100%);
+      transition:transform .25s ease;
+      box-shadow:2px 0 24px rgba(0,0,0,.4);
+    }
+    aside.sidebar.drawer-open{ transform:translateX(0); }
+
+    #mobileMenuBtn{
+      display:flex; align-items:center; justify-content:center;
+      width:32px; height:32px; flex-shrink:0;
+      background:none; border:none; color:#fff; font-size:16px; padding:0;
+    }
+
+    /* Dims and closes the drawer when tapped outside it — same
+       affordance as tapping outside any mobile menu. Pointer-events
+       stays off while transparent so it can never silently eat a tap
+       on the page underneath before the drawer has actually opened. */
+    #sidebarBackdrop{
+      display:block; position:fixed; inset:0; z-index:499;
+      background:rgba(0,0,0,.55); opacity:0; pointer-events:none;
+      transition:opacity .2s ease;
+    }
+    #sidebarBackdrop.active{ opacity:1; pointer-events:auto; }
+
+    /* THE TEXT-OVERLAP FIX. Both halves of the top bar had
+       flex-shrink:0 — meaning neither was ever allowed to shrink to
+       fit, so on a phone narrow enough that "LM. CMS / Hero Messages"
+       and "All changes saved [Save to GitHub]" didn't both fit on one
+       row, they didn't wrap or truncate — they just sat on top of
+       each other. The section label (topbarSection) already hides
+       below 720px, which helps but isn't enough on its own on
+       smaller phones. Hiding the save-status text (the color-coded
+       dot next to it already carries the same information, and it
+       keeps its title="" tooltip for anyone who taps or long-presses
+       it) and shortening the button to just its icon removes enough
+       width that the two sides always fit on one line, at any phone
+       width, without needing to guess a breakpoint for one specific
+       screen size. */
+    .topbar-left .section-label{display:none;}
+    .topbar-right .save-status span:not(.dot){display:none;}
+    #topbar button.primary{padding:9px 12px;}
+    #topbar button.primary span{display:none;}
+  }
+  code.k{background:#0f0f0f;border:1px solid var(--line);padding:1px 6px;border-radius:4px;font-size:12px;color:#ddd;}
+
+  /* ---------- Top bar (always-visible save) ---------- */
+  #topbar{display:none;align-items:center;justify-content:space-between;gap:16px;padding:11px 20px;background:rgba(18,18,18,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:100;}
+  #topbar.active{display:flex;}
+  .topbar-left{display:flex;align-items:center;gap:10px;min-width:0;}
+  .topbar-left .dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 6px var(--good);flex-shrink:0;}
+  .topbar-left .brand{font-weight:800;color:#fff;font-size:.85rem;flex-shrink:0;}
+  .topbar-left .sep{color:#444;flex-shrink:0;}
+  .topbar-left .section-label{color:#ccc;font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .topbar-right{display:flex;align-items:center;gap:14px;flex-shrink:0;}
+  #topbar button.primary{width:auto;padding:9px 18px;}
+
+  /* ---------- Collapsible cards (hero / reviews) ---------- */
+  .collapsible-head{display:flex;align-items:center;gap:10px;cursor:pointer;}
+  .collapsible-head .preview-line{flex:1;font-size:13px;color:#bbb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .collapsible-body{overflow:hidden;transition:max-height .25s ease, opacity .2s ease;}
+
+  /* ---------- Drag reorder ---------- */
+  .drag-handle{cursor:grab;touch-action:none;}
+  .drag-handle:active{cursor:grabbing;}
+  [data-uid].dragging{opacity:.35;}
+  [data-uid].drag-target{will-change:transform;}
+
+  /* ---------- Media previews ---------- */
+  /* aspect-ratio starts at a neutral 16/10 placeholder and is overwritten
+     inline (by wirePreviewAspect(), see script near the bottom) the
+     moment the real image/video loads and its true dimensions are known
+     — so a portrait screenshot, a square render and a wide banner each
+     get a box shaped like themselves instead of all being force-cropped
+     into the same landscape frame. max-width keeps that box from ever
+     ballooning to the full width of the panel just because the field
+     next to it is wide. */
+  .media-preview{width:100%;max-width:320px;aspect-ratio:16/10;background:#0a0a0a repeating-conic-gradient(#151515 0% 25%,#0a0a0a 0% 50%) 0 0/16px 16px;border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-top:10px;position:relative;transition:aspect-ratio .15s ease;}
+  .media-preview img,.media-preview video{width:100%;height:100%;object-fit:cover;display:block;}
+  .media-preview .yt-badge{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.03em;}
+  .media-preview .empty-note{color:var(--text-dim);font-size:12px;text-align:center;padding:0 14px;}
+
+  /* ---------- Media Library ---------- */
+  .media-toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px;}
+  .media-toolbar .field{flex:1;min-width:200px;margin-bottom:0;}
+  .dropzone{border:1.5px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--text-dim);font-size:13px;margin-bottom:22px;transition:border-color .15s, background .15s;cursor:pointer;}
   .dropzone.hover{border-color:#fff;background:rgba(255,2
