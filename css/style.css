@@ -710,11 +710,25 @@ textarea { resize: vertical; }
 .lightbox-nav {
   position: fixed;
   top: 50%;
+  /* On mobile, the browser's own address bar retracts as you scroll,
+     which changes the actual visible viewport height mid-scroll.
+     `top: 50%` on a `position: fixed` element is computed against
+     that viewport height — so as the address bar animates away, this
+     50% mark moves, and the arrow visibly jumps to catch up. That's
+     the snap in the recording: nothing to do with scroll performance,
+     it's the viewport itself changing size underneath a percentage
+     value. The line below asks for 50% of the SMALL viewport instead
+     — the one that already assumes the address bar is showing, so it
+     never has to move when the bar does. Older browsers that don't
+     understand `svh` simply ignore this line and keep the `50%`
+     above, so this is a safe, no-downside upgrade either way. */
+  top: 50svh;
   /* translate3d instead of translateY promotes each arrow onto its own
      GPU layer, so the browser composites it independently of whatever
-     is scrolling. Paired with the JS that moves these buttons out of
-     the scrolling modal (see detachControlsFromScroller in script.js),
-     this is what removes the lag-then-jump on a fast flick. */
+     is scrolling. Paired with the sibling-outside-the-scroller markup
+     these controls already use (see the HTML comment above
+     #lightboxControls), this keeps the arrow from lagging behind a
+     fast flick. */
   transform: translate3d(0, -50%, 0);
   backface-visibility: hidden;
   width: 46px;

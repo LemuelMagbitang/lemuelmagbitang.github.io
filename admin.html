@@ -237,8 +237,9 @@
   .media-tile .thumb{width:100%;aspect-ratio:1/1;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;flex-shrink:0;}
   .media-tile .thumb img,.media-tile .thumb video{width:100%;height:100%;object-fit:cover;}
   .media-tile .thumb i{font-size:26px;color:#555;}
-  .media-tile .meta{padding:9px 10px;min-height:1px;}
-  .media-tile .fname{font-size:11.5px;color:#ddd!important;word-break:break-all;line-height:1.4;max-height:2.8em;overflow:hidden;display:block;}
+  .media-tile .meta{padding:9px 10px;min-height:1px;background:rgba(255,255,255,.02);}
+  .media-tile .fname{font-size:12.5px;font-weight:600;color:#fff!important;word-break:break-all;line-height:1.4;max-height:2.8em;overflow:hidden;display:block;}
+  .media-tile .thumb svg{color:#7a7a7a;}
   .media-tile .tile-actions{display:flex;gap:6px;padding:0 10px 10px;}
   .media-tile .tile-actions button{flex:1;padding:6px 4px;font-size:11px;}
   /* A file appears in the grid the instant it's dropped/chosen — using a
@@ -880,7 +881,16 @@ RENDERERS.hero = function(data){
         <div class="field"><label class="field-label">Source <span style="opacity:.5">(optional)</span></label><input data-f="source" value="${attr(item.source)}" placeholder="e.g. The Design of Everyday Things"></div>
       </div>
     `;
-    const MAX = 180;
+    // No local MAX here — this function already sees the outer MAX
+    // declared in paint() above, via normal closure scoping. A
+    // duplicate `const MAX = 180` used to sit right here, AFTER the
+    // template above already used it. Because it's a const, that
+    // redeclaration governed the whole function from the top, not
+    // just from its own line down — so the reference above was
+    // reaching for a MAX that technically didn't exist yet ("temporal
+    // dead zone"), which is exactly the crash in your screenshot. This
+    // is why editing, moving, or adding a hero message made the field
+    // panel throw instead of rendering.
     el.querySelectorAll('[data-f]').forEach(inp=>{
       inp.addEventListener('input', ()=>{
         const f = inp.dataset.f;
@@ -1812,6 +1822,47 @@ function fileKind(path){
   return 'other';
 }
 
+/* Inline SVG icons for the folder/file browser, used instead of the
+   Font Awesome <i> icons the rest of the CMS uses. Two reasons:
+
+   1. This exact tile (folder icon + name underneath) has been reported
+      as broken multiple times, in a way I haven't been able to
+      reproduce or fully explain from code alone. An inline SVG can't
+      fail to load the way an icon FONT can (blocked request, slow
+      CDN, a font that loads but a glyph mapping that doesn't) — so
+      this removes an entire category of possible cause, confirmed or
+      not, rather than adding another theoretical CSS patch on top of
+      the two from previous rounds.
+   2. It puts the folder icon and the file-type icons on the same
+      footing: both are always literally present in the page as soon
+      as it renders, nothing to wait on or fail silently.
+
+   FOLDER_ICON_SVG / FILE_ICON_SVG use stroke="currentColor" so they
+   pick up whatever CSS color is set on their wrapping element, same
+   as a font icon would. */
+const FOLDER_ICON_SVG = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.7c0-.94.76-1.7 1.7-1.7h4.46c.4 0 .78.15 1.08.42l1.3 1.18c.3.27.68.42 1.08.42h6.68c.94 0 1.7.76 1.7 1.7v9.08c0 .94-.76 1.7-1.7 1.7H4.7c-.94 0-1.7-.76-1.7-1.7V6.7z"/></svg>';
+const FILE_ICON_SVG = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1z"/><path d="M14 3.5v4h4" stroke-linecap="round"/></svg>';
+const BROKEN_IMAGE_SVG_ESCAPED = FILE_ICON_SVG.replace(/"/g, '&quot;');
+
+// One shared builder for both the Media Library screen's own grid and
+// the "Choose a file" picker popup — previously each had its own
+// near-identical copy of this markup, which is exactly how a fix to
+// one and not the other went unnoticed for a couple of rounds. Now
+// there's exactly one place that decides what a tile looks like.
+function folderTileHtml(name){
+  return `<div class="thumb">${FOLDER_ICON_SVG}</div><div class="meta"><div class="fname">${esc(name)}</div></div>`;
+}
+function fileTileHtml(item){
+  const kind = fileKind(item.path);
+  const name = item.path.split('/').pop();
+  const thumbHtml = kind === 'image'
+    ? `<img src="${attr(item.path)}" loading="lazy" onerror="this.parentElement.innerHTML='${BROKEN_IMAGE_SVG_ESCAPED}'">`
+    : kind === 'video'
+    ? `<video src="${attr(item.path)}" muted preload="metadata"></video>`
+    : FILE_ICON_SVG;
+  return `<div class="thumb">${thumbHtml}</div><div class="meta"><div class="fname">${esc(name)}</div></div>`;
+}
+
 /* =====================================================================
    13a. MEDIA PICKER MODAL — "Browse…" popup usable from any field
    =====================================================================
@@ -1904,22 +1955,15 @@ function openMediaPicker(onPick){
     folders.forEach(f => {
       const tile = document.createElement('div');
       tile.className = 'media-tile folder-tile';
-      tile.innerHTML = `<div class="thumb"><i class="fa-solid fa-folder"></i></div><div class="meta"><div class="fname">${esc(f)}</div></div>`;
+      tile.innerHTML = folderTileHtml(f);
       tile.addEventListener('click', () => { mediaPickerPath = mediaPickerPath + '/' + f; paintPicker(); });
       grid.appendChild(tile);
     });
     files.forEach(item => {
-      const kind = fileKind(item.path);
-      const name = item.path.split('/').pop();
       const tile = document.createElement('div');
       tile.className = 'media-tile';
       tile.style.cursor = 'pointer';
-      const thumbHtml = kind === 'image'
-        ? `<img src="${attr(item.path)}" loading="lazy" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-image&quot;&gt;&lt;/i&gt;'">`
-        : kind === 'video'
-        ? `<video src="${attr(item.path)}" muted preload="metadata"></video>`
-        : `<i class="fa-solid fa-file"></i>`;
-      tile.innerHTML = `<div class="thumb">${thumbHtml}</div><div class="meta"><div class="fname">${esc(name)}</div></div>`;
+      tile.innerHTML = fileTileHtml(item);
       tile.addEventListener('click', () => { onPick(item.path); close(); });
       grid.appendChild(tile);
     });
@@ -2085,23 +2129,14 @@ RENDERERS.media = async function(){
     folders.forEach(f => {
       const tile = document.createElement('div');
       tile.className = 'media-tile folder-tile';
-      tile.innerHTML = `<div class="thumb"><i class="fa-solid fa-folder"></i></div><div class="meta"><div class="fname">${esc(f)}</div></div>`;
+      tile.innerHTML = folderTileHtml(f);
       tile.addEventListener('click', () => { mediaCurrentPath = mediaCurrentPath + '/' + f; paint(); });
       grid.appendChild(tile);
     });
     files.forEach(item => {
-      const kind = fileKind(item.path);
-      const name = item.path.split('/').pop();
       const tile = document.createElement('div');
       tile.className = 'media-tile';
-      const thumbHtml = kind === 'image'
-        ? `<img src="${attr(item.path)}" loading="lazy" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-image&quot;&gt;&lt;/i&gt;'">`
-        : kind === 'video'
-        ? `<video src="${attr(item.path)}" muted preload="metadata"></video>`
-        : `<i class="fa-solid fa-file"></i>`;
-      tile.innerHTML = `
-        <div class="thumb">${thumbHtml}</div>
-        <div class="meta"><div class="fname">${esc(name)}</div></div>
+      tile.innerHTML = fileTileHtml(item) + `
         <div class="tile-actions">
           <button class="ghost" data-copy>Copy path</button>
           <button class="danger" data-del>Delete</button>
@@ -2160,7 +2195,7 @@ RENDERERS.media = async function(){
         const localUrl = isPreviewable ? URL.createObjectURL(file) : null;
         const tile = document.createElement('div');
         tile.className = 'media-tile is-uploading';
-        const thumbInner = !localUrl ? '<i class="fa-solid fa-file"></i>'
+        const thumbInner = !localUrl ? FILE_ICON_SVG
           : file.type.startsWith('video/') ? `<video src="${localUrl}" muted></video>`
           : `<img src="${localUrl}">`;
         tile.innerHTML = `
