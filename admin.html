@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LM. — Site CMS</title>
 <meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="assets/projects/site/favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -124,7 +125,11 @@
   .chip{padding:7px 13px;border:1px solid var(--line);border-radius:20px;font-size:12.5px;font-weight:600;color:var(--text-dim);background:transparent;}
   .chip.selected{color:#111;background:#fff;border-color:#fff;}
 
-  .focus-picker{position:relative;width:100%;max-width:260px;aspect-ratio:16/10;background:#0a0a0a repeating-conic-gradient(#151515 0% 25%,#0a0a0a 0% 50%) 0 0/16px 16px;border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:crosshair;}
+  /* 1/1, not 16/10: a project card on the live site is always a square
+     (.project-card{aspect-ratio:1/1} in style.css) — cropping the focus
+     point in a wide box here meant what you dragged never matched what
+     the card actually showed. */
+  .focus-picker{position:relative;width:100%;max-width:220px;aspect-ratio:1/1;background:#0a0a0a repeating-conic-gradient(#151515 0% 25%,#0a0a0a 0% 50%) 0 0/16px 16px;border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:crosshair;}
   .focus-picker img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;opacity:.55;}
   .focus-crosshair{position:absolute;width:16px;height:16px;border:2px solid #fff;border-radius:50%;background:rgba(255,255,255,.15);transform:translate(-50%,-50%);box-shadow:0 0 0 2000px rgba(0,0,0,0);pointer-events:none;}
   .focus-crosshair:before,.focus-crosshair:after{content:"";position:absolute;background:#fff;}
@@ -186,7 +191,15 @@
   [data-uid].drag-target{will-change:transform;}
 
   /* ---------- Media previews ---------- */
-  .media-preview{width:100%;aspect-ratio:16/10;background:#0a0a0a repeating-conic-gradient(#151515 0% 25%,#0a0a0a 0% 50%) 0 0/16px 16px;border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-top:10px;position:relative;}
+  /* aspect-ratio starts at a neutral 16/10 placeholder and is overwritten
+     inline (by wirePreviewAspect(), see script near the bottom) the
+     moment the real image/video loads and its true dimensions are known
+     — so a portrait screenshot, a square render and a wide banner each
+     get a box shaped like themselves instead of all being force-cropped
+     into the same landscape frame. max-width keeps that box from ever
+     ballooning to the full width of the panel just because the field
+     next to it is wide. */
+  .media-preview{width:100%;max-width:320px;aspect-ratio:16/10;background:#0a0a0a repeating-conic-gradient(#151515 0% 25%,#0a0a0a 0% 50%) 0 0/16px 16px;border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-top:10px;position:relative;transition:aspect-ratio .15s ease;}
   .media-preview img,.media-preview video{width:100%;height:100%;object-fit:cover;display:block;}
   .media-preview .yt-badge{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.03em;}
   .media-preview .empty-note{color:var(--text-dim);font-size:12px;text-align:center;padding:0 14px;}
@@ -199,13 +212,23 @@
   .dropzone i{font-size:22px;display:block;margin-bottom:8px;color:#666;}
   .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
   .media-tile{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:9px;overflow:hidden;}
-  .media-tile .thumb{width:100%;aspect-ratio:1/1;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .media-tile .thumb{width:100%;aspect-ratio:1/1;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
   .media-tile .thumb img,.media-tile .thumb video{width:100%;height:100%;object-fit:cover;}
   .media-tile .thumb i{font-size:26px;color:#555;}
   .media-tile .meta{padding:9px 10px;}
   .media-tile .fname{font-size:11.5px;color:#ddd;word-break:break-all;line-height:1.4;max-height:2.8em;overflow:hidden;}
   .media-tile .tile-actions{display:flex;gap:6px;padding:0 10px 10px;}
   .media-tile .tile-actions button{flex:1;padding:6px 4px;font-size:11px;}
+  /* A file appears in the grid the instant it's dropped/chosen — using a
+     local blob preview of the file itself, before any network call —
+     with this overlay marking it as still in flight, instead of the
+     whole grid staying blank until every file in the batch finishes
+     uploading (see handleFiles()). */
+  .media-tile.is-uploading .thumb img,.media-tile.is-uploading .thumb video{opacity:.5;}
+  .media-tile .upload-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.25);color:#fff;font-size:20px;}
+  .media-tile .upload-status{font-size:11px;color:var(--text-dim);padding:0 10px 9px;}
+  .media-tile.is-error .upload-status{color:var(--danger);}
+  .media-tile.is-error .thumb{border:1px solid rgba(224,88,79,.4);}
   .media-folder-crumb{font-size:12.5px;color:var(--text-dim);margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
   .media-folder-crumb button{background:none;border:none;color:#8ab;font-size:12.5px;padding:0;}
   .media-folder-crumb button:hover{text-decoration:underline;color:#fff;}
@@ -1215,9 +1238,10 @@ RENDERERS.projects = async function(data){
           <div>
             <label class="field-label">Drag to set focus point</label>
             <div class="focus-picker" data-focuspicker>
-              ${p.thumbnail.src ? `<img src="${attr(p.thumbnail.src)}" data-thumb-img onerror="this.style.display='none'">` : `<img data-thumb-img style="display:none">`}
+              <img data-thumb-img style="display:none" onerror="this.style.display='none'">
               <div class="focus-crosshair" data-crosshair></div>
             </div>
+            <p class="hint" data-thumb-fallback-note style="display:none">Preview is the project's first media item — no thumbnail file is set, same as the live site.</p>
           </div>
         </div>
       </div>
@@ -1230,14 +1254,31 @@ RENDERERS.projects = async function(data){
       </div>
     `;
 
+    // Thumbnail preview: an explicit thumbnail.src always wins; empty,
+    // and it falls back to the project's first image/YouTube media item
+    // — exactly what the live site's fillMissingThumbnails() does, so
+    // what you see while dragging the focus point is what visitors see,
+    // not a blank box that only appears once you type a path by hand.
+    function refreshThumbPreview(){
+      const img = el.querySelector('[data-thumb-img]');
+      const note = el.querySelector('[data-thumb-fallback-note]');
+      if (!img) return;
+      const explicit = p.thumbnail.src;
+      const fallback = explicit ? '' : computeFallbackThumbSrc(p.media);
+      const src = explicit || fallback;
+      img.style.display = src ? '' : 'none';
+      if (src) img.src = src;
+      if (note) note.style.display = fallback ? '' : 'none';
+    }
+    attachMediaBrowseButton(el.querySelector('[data-f="thumb-src"]'), () => refreshThumbPreview());
+
     // simple fields
     el.querySelectorAll('[data-f]').forEach(inp=>{
       inp.addEventListener('input', ()=>{
         const f = inp.dataset.f;
         if(f==='thumb-src'){
           p.thumbnail.src = inp.value;
-          const img = el.querySelector('[data-thumb-img]');
-          if (img) { img.style.display = inp.value ? '' : 'none'; img.src = inp.value; }
+          refreshThumbPreview();
         }
         else if(f==='thumb-zoom') p.thumbnail.zoom = parseFloat(inp.value)||1;
         else if(f==='thumb-focus'){ p.thumbnail.focus = inp.value; setFromFocusStr(); }
@@ -1276,6 +1317,7 @@ RENDERERS.projects = async function(data){
       crosshair.style.top = parts[1] + '%';
     }
     setFromFocusStr();
+    refreshThumbPreview();
     function pointerToFocus(e){
       const rect = picker.getBoundingClientRect();
       const cx = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
@@ -1322,7 +1364,7 @@ RENDERERS.projects = async function(data){
                 <option value="youtube" ${m.type==='youtube'?'selected':''}>YouTube</option>
               </select>
             </div>
-            <div class="field"><label class="field-label">Source (file path or URL)</label><input data-mf="src" value="${attr(m.src)}"></div>
+            <div class="field"><label class="field-label">Source (file path or URL)</label><input data-mf="src" value="${attr(m.src)}" placeholder="assets/projects/your-folder/artwork.jpg"></div>
           </div>
           <div class="row">
             <div class="field"><label class="field-label">Caption <span style="opacity:.5">(optional)</span></label><input data-mf="caption" value="${attr(m.caption)}"></div>
@@ -1338,8 +1380,16 @@ RENDERERS.projects = async function(data){
           <div data-mediapreview></div>
         `;
         const previewEl = row.querySelector('[data-mediapreview]');
-        function refreshPreview(){ previewEl.innerHTML = buildMediaPreviewHtml(m); }
+        function refreshPreview(){
+          previewEl.innerHTML = buildMediaPreviewHtml(m);
+          wirePreviewAspect(previewEl.firstElementChild, m);
+          // If this is (or might become) the project's fallback
+          // thumbnail — first image/YouTube item, thumbnail.src left
+          // blank — the focus-picker preview needs to follow along too.
+          if (typeof refreshThumbPreview === 'function') refreshThumbPreview();
+        }
         refreshPreview();
+        attachMediaBrowseButton(row.querySelector('[data-mf="src"]'), () => refreshPreview());
 
         row.querySelectorAll('[data-mf]').forEach(inp=> inp.addEventListener('input', ()=>{
           m[inp.dataset.mf]=inp.value;
@@ -1368,6 +1418,9 @@ RENDERERS.projects = async function(data){
       medWrap.replaceWith(freshWrap);
       medWrap = freshWrap;
       enableDragReorder(() => el.querySelector('[data-medialist]'), p.media, flagUnsaved, paintMedia);
+      // Covers add/delete/reorder even when the list is empty (each
+      // row's own refreshPreview() already covers edits to that row).
+      refreshThumbPreview();
     }
     paintMedia();
     el.querySelector('[data-addmedia]').addEventListener('click', ()=>{ p.media.push({type:'image',src:'',caption:'',orientation:'',_uid:uid()}); flagUnsaved(); paintMedia(); });
@@ -1402,7 +1455,21 @@ RENDERERS.about = function(data){
         <div class="field"><label class="field-label">Headline</label><input id="a_headline" value="${attr(a.headline||'')}"></div>
         <div class="field"><label class="field-label">Subhead</label><input id="a_subhead" value="${attr(a.subhead||'')}"></div>
         <div class="field"><label class="field-label">Bio</label><textarea id="a_bio" rows="4">${esc(a.bio||'')}</textarea></div>
-        <div class="field"><label class="field-label">Profile photo path or URL</label><input id="a_photo" value="${attr(a.photo||'')}"></div>
+      </div>
+
+      <div class="panel" style="background:#141414;">
+        <h3 style="font-size:.85rem">Profile Photo</h3>
+        <p class="panel-sub">Shown as a circle on the About page — the preview below matches that shape, so you're editing the actual look rather than guessing from a bare path.</p>
+        <div class="two-col">
+          <div>
+            <div class="field"><label class="field-label">Path or URL</label><input id="a_photo" value="${attr(a.photo||'')}" placeholder="assets/projects/site/profile.jpg"></div>
+            <p class="hint">Pick from Media Library, paste a repo path, or a full image URL.</p>
+          </div>
+          <div>
+            <label class="field-label">Preview</label>
+            <div id="a_photo_preview" style="width:140px;height:140px;border-radius:50%;overflow:hidden;background:#0a0a0a repeating-conic-gradient(#151515 0% 25%,#0a0a0a 0% 50%) 0 0/16px 16px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;"></div>
+          </div>
+        </div>
       </div>
 
       <div class="panel">
@@ -1432,7 +1499,22 @@ RENDERERS.about = function(data){
         <button class="add-btn" id="addAward"><i class="fa-solid fa-plus"></i> Add entry</button>
       </div>
     `;
-    ['a_headline','a_subhead','a_bio','a_photo'].forEach(id=>document.getElementById(id).addEventListener('input',flagUnsaved));
+    ['a_headline','a_subhead','a_bio'].forEach(id=>document.getElementById(id).addEventListener('input',flagUnsaved));
+
+    // Profile photo: live circular preview + a Media Library browse
+    // button, instead of a bare text field you can't see the result of
+    // without saving, redeploying, and checking the live site.
+    const photoInput = document.getElementById('a_photo');
+    const photoPreviewBox = document.getElementById('a_photo_preview');
+    function refreshPhotoPreview(){
+      const src = photoInput.value.trim();
+      photoPreviewBox.innerHTML = src
+        ? `<img src="${attr(src)}" style="width:100%;height:100%;object-fit:cover;display:block;" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-triangle-exclamation&quot; style=&quot;color:#e0584f;font-size:22px&quot;&gt;&lt;/i&gt;'">`
+        : `<i class="fa-solid fa-user" style="color:#555;font-size:32px"></i>`;
+    }
+    refreshPhotoPreview();
+    photoInput.addEventListener('input', () => { flagUnsaved(); refreshPhotoPreview(); });
+    attachMediaBrowseButton(photoInput, () => { flagUnsaved(); refreshPhotoPreview(); });
 
     buildTagBox('tags_software', a.softwareSkills, 'e.g. Blender');
     buildTagBox('tags_multimedia', a.multimediaSkills, 'e.g. 3D Modeling');
@@ -1575,6 +1657,196 @@ function fileKind(path){
   return 'other';
 }
 
+/* =====================================================================
+   13a. MEDIA PICKER MODAL — "Browse…" popup usable from any field
+   =====================================================================
+   Same folder/file browser as the Media Library screen, as a pick-one-
+   and-close overlay — so choosing a Source/Photo/Thumbnail means
+   clicking the file you want instead of alt-tabbing to Media Library,
+   copying a path, and tabbing back to paste it. Reads the same cached
+   tree (mediaTreeCache / loadMediaTree above) so it never re-fetches
+   just because it's opened from a different screen. */
+let mediaPickerPath = 'assets';
+
+function childrenOfPath(tree, path){
+  const prefix = path ? path + '/' : '';
+  const folders = new Set();
+  const files = [];
+  tree.forEach(item => {
+    if (!item.path.startsWith(prefix)) return;
+    const rest = item.path.slice(prefix.length);
+    if (!rest) return;
+    const slash = rest.indexOf('/');
+    if (slash === -1) { if (item.type === 'blob') files.push(item); }
+    else folders.add(rest.slice(0, slash));
+  });
+  return { folders: [...folders].sort(), files: files.sort((a,b)=>a.path.localeCompare(b.path)) };
+}
+
+function openMediaPicker(onPick){
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:640px;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);flex-shrink:0;">
+        <strong style="color:#fff;font-size:.95rem">Choose a file</strong>
+        <button class="icon-btn" data-close-picker type="button"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div style="padding:14px 20px 0;flex-shrink:0;">
+        <div class="media-folder-crumb" id="pickerCrumbs"></div>
+      </div>
+      <div class="media-grid" id="pickerGrid" style="padding:4px 20px 20px;overflow-y:auto;"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  function close(){ overlay.remove(); }
+  overlay.addEventListener('click', e=>{ if(e.target===overlay) close(); });
+  overlay.querySelector('[data-close-picker]').addEventListener('click', close);
+  document.addEventListener('keydown', function escHandler(e){
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
+  });
+
+  async function paintPicker(){
+    const grid = overlay.querySelector('#pickerGrid');
+    let tree;
+    try { tree = await loadMediaTree(false); }
+    catch(err){
+      grid.innerHTML = `<div class="banner info" style="grid-column:1/-1;border-color:rgba(224,88,79,.4)">Couldn't load your files — ${esc(err.message)}</div>`;
+      return;
+    }
+
+    const { folders, files } = childrenOfPath(tree, mediaPickerPath);
+    const crumbs = mediaPickerPath.split('/');
+    const crumbWrap = overlay.querySelector('#pickerCrumbs');
+    crumbWrap.innerHTML = '';
+    crumbs.forEach((seg, i) => {
+      const pathHere = crumbs.slice(0, i+1).join('/');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = seg;
+      btn.addEventListener('click', () => { mediaPickerPath = pathHere; paintPicker(); });
+      crumbWrap.appendChild(btn);
+      if (i < crumbs.length - 1) {
+        const sep = document.createElement('span'); sep.textContent = '/'; sep.style.color = '#444';
+        crumbWrap.appendChild(sep);
+      }
+    });
+
+    grid.innerHTML = '';
+    if (!folders.length && !files.length) {
+      grid.innerHTML = `<div class="banner muted" style="grid-column:1/-1">Nothing in this folder. Upload it from Media Library first.</div>`;
+    }
+    folders.forEach(f => {
+      const tile = document.createElement('div');
+      tile.className = 'media-tile folder-tile';
+      tile.innerHTML = `<div class="thumb"><i class="fa-solid fa-folder"></i></div><div class="meta"><div class="fname">${esc(f)}</div></div>`;
+      tile.addEventListener('click', () => { mediaPickerPath = mediaPickerPath + '/' + f; paintPicker(); });
+      grid.appendChild(tile);
+    });
+    files.forEach(item => {
+      const kind = fileKind(item.path);
+      const name = item.path.split('/').pop();
+      const tile = document.createElement('div');
+      tile.className = 'media-tile';
+      tile.style.cursor = 'pointer';
+      const thumbHtml = kind === 'image'
+        ? `<img src="${attr(item.path)}" loading="lazy" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-image&quot;&gt;&lt;/i&gt;'">`
+        : kind === 'video'
+        ? `<video src="${attr(item.path)}" muted preload="metadata"></video>`
+        : `<i class="fa-solid fa-file"></i>`;
+      tile.innerHTML = `<div class="thumb">${thumbHtml}</div><div class="meta"><div class="fname">${esc(name)}</div></div>`;
+      tile.addEventListener('click', () => { onPick(item.path); close(); });
+      grid.appendChild(tile);
+    });
+  }
+  paintPicker();
+}
+
+// Drops a small "Browse…" icon-button next to an existing path input,
+// wrapping the two in one row so the label stays put above them. Picking
+// a file writes the path into the input, fires a real `input` event (so
+// whatever this field was already wired to do on typing still runs), and
+// calls onPicked with the chosen path for anything that needs to react
+// beyond that — a live preview, most often.
+function attachMediaBrowseButton(inputEl, onPicked){
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  inputEl.parentNode.insertBefore(row, inputEl);
+  row.appendChild(inputEl);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'icon-btn';
+  btn.title = 'Browse media library';
+  btn.style.flexShrink = '0';
+  btn.innerHTML = '<i class="fa-solid fa-folder-open"></i>';
+  row.appendChild(btn);
+  btn.addEventListener('click', () => {
+    openMediaPicker(path => {
+      inputEl.value = path;
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+      if (onPicked) onPicked(path);
+    });
+  });
+  return btn;
+}
+
+/* =====================================================================
+   13b. PREVIEW ASPECT-RATIO AUTO-FIT
+   =====================================================================
+   Every .media-preview box starts at a neutral 16/10 placeholder (see
+   the CSS above) and is resized here, once the real media is loaded, to
+   its true aspect ratio — a square render stays square, a phone
+   screenshot stays tall, a wide banner stays wide — instead of every
+   preview being force-cropped into the same landscape frame regardless
+   of what it actually is. Clamped so a very extreme panorama or a very
+   tall image still stays a reasonably sized box in this UI. */
+function fitPreviewAspect(boxEl, ratio){
+  if (!boxEl || !ratio || !isFinite(ratio) || ratio <= 0) return;
+  boxEl.style.aspectRatio = Math.max(9/16, Math.min(21/9, ratio));
+}
+
+function wirePreviewAspect(boxEl, m){
+  if (!boxEl) return;
+  if (m.type === 'video') {
+    const v = boxEl.querySelector('video');
+    if (v) v.addEventListener('loadedmetadata', () => fitPreviewAspect(boxEl, v.videoWidth / v.videoHeight), { once: true });
+    return;
+  }
+  if (m.type === 'youtube') {
+    // No cheap way to read the real embed ratio without another network
+    // call, so this uses the same rule of thumb the live lightbox already
+    // uses: a /shorts/ link is portrait, everything else is landscape.
+    fitPreviewAspect(boxEl, /\/shorts\//.test(m.src || '') ? 9/16 : 16/9);
+    return;
+  }
+  const img = boxEl.querySelector('img');
+  if (img) {
+    if (img.complete && img.naturalWidth) fitPreviewAspect(boxEl, img.naturalWidth / img.naturalHeight);
+    else img.addEventListener('load', () => fitPreviewAspect(boxEl, img.naturalWidth / img.naturalHeight), { once: true });
+  }
+}
+
+/* =====================================================================
+   13c. PROJECT THUMBNAIL FALLBACK
+   =====================================================================
+   Mirrors fillMissingThumbnails() in the live site's js/script.js: if a
+   project has no explicit thumbnail, the card uses its first Image-type
+   media item, or failing that its first YouTube-type item's thumbnail.
+   Used here purely to preview what the live site will show — it never
+   writes anything into thumbnail.src itself, same as the live site
+   only ever fills in the rendered <img>, never the underlying data. */
+function computeFallbackThumbSrc(media){
+  const firstImage = (media || []).find(m => m.type === 'image' && m.src);
+  if (firstImage) return firstImage.src;
+  const firstYoutube = (media || []).find(m => m.type === 'youtube' && m.src);
+  if (firstYoutube) {
+    const id = extractYouTubeId(firstYoutube.src);
+    if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+  }
+  return '';
+}
+
 RENDERERS.media = async function(){
   content.innerHTML = `<div class="loading-row"><i class="fa-solid fa-circle-notch spin"></i> Loading your files…</div>`;
   let tree;
@@ -1705,28 +1977,77 @@ RENDERERS.media = async function(){
 
     async function handleFiles(fileList){
       const folder = document.getElementById('uploadPath').value.trim().replace(/^\/+|\/+$/g,'') || 'assets';
-      for (const file of Array.from(fileList)) {
+      const files = Array.from(fileList);
+      const grid = document.getElementById('mediaGrid');
+
+      // Every file gets a real tile the instant it's dropped/chosen —
+      // its own local preview (from the file itself, via
+      // createObjectURL, before any network request has even started)
+      // plus a spinner overlay — instead of the dropzone showing one
+      // spinner-text line while the grid stays completely blank until
+      // the whole batch finishes. This is what makes it feel instant
+      // like dragging a file into a folder, the way GitHub's own
+      // uploader does, rather than a silent wait.
+      const emptyBanner = grid.querySelector('.banner.muted');
+      if (emptyBanner) emptyBanner.remove();
+
+      const jobs = files.map(file => {
         const path = folder + '/' + file.name;
-        dropzone.innerHTML = `<i class="fa-solid fa-circle-notch spin"></i> Uploading ${esc(file.name)}…`;
+        const isPreviewable = /^image\/|^video\//.test(file.type);
+        const localUrl = isPreviewable ? URL.createObjectURL(file) : null;
+        const tile = document.createElement('div');
+        tile.className = 'media-tile is-uploading';
+        const thumbInner = !localUrl ? '<i class="fa-solid fa-file"></i>'
+          : file.type.startsWith('video/') ? `<video src="${localUrl}" muted></video>`
+          : `<img src="${localUrl}">`;
+        tile.innerHTML = `
+          <div class="thumb">${thumbInner}<div class="upload-overlay"><i class="fa-solid fa-circle-notch spin"></i></div></div>
+          <div class="meta"><div class="fname">${esc(file.name)}</div></div>
+          <div class="upload-status">Uploading…</div>
+        `;
+        grid.prepend(tile);
+        return { file, path, tile, localUrl };
+      });
+
+      for (const job of jobs) {
         try {
           const dataUrl = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result);
             reader.onerror = reject;
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(job.file);
           });
           // Check for an existing file at this exact path first, so a
           // same-name upload overwrites cleanly instead of erroring.
           let existingSha = null;
-          const existing = tree.find(t => t.path === path);
+          const existing = tree.find(t => t.path === job.path);
           if (existing) existingSha = existing.sha;
 
-          await GH.uploadBinary(path, dataUrl, `CMS: upload ${path}`, existingSha);
-          toast(`Uploaded ${file.name}.`);
+          await GH.uploadBinary(job.path, dataUrl, `CMS: upload ${job.path}`, existingSha);
+
+          job.tile.classList.remove('is-uploading');
+          job.tile.classList.add('is-done');
+          const overlay = job.tile.querySelector('.upload-overlay');
+          if (overlay) overlay.remove();
+          const status = job.tile.querySelector('.upload-status');
+          if (status) status.remove();
+          toast(`Uploaded ${job.file.name}.`);
         } catch(err){
-          toast(`${file.name}: ${err.message}`, true);
+          job.tile.classList.remove('is-uploading');
+          job.tile.classList.add('is-error');
+          const overlay = job.tile.querySelector('.upload-overlay');
+          if (overlay) overlay.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#ff8f87"></i>';
+          const status = job.tile.querySelector('.upload-status');
+          if (status) status.textContent = 'Failed — ' + err.message;
+          toast(`${job.file.name}: ${err.message}`, true);
+        } finally {
+          if (job.localUrl) URL.revokeObjectURL(job.localUrl);
         }
       }
+
+      // Full refresh once the batch settles — this is what replaces the
+      // temporary tiles above with the real, permanent ones (with their
+      // Copy path / Delete buttons) sourced from the actual repo state.
       tree = await loadMediaTree(true);
       mediaCurrentPath = folder;
       paint();

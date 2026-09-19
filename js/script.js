@@ -356,7 +356,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (bioEl && a.bio) bioEl.textContent = a.bio;
 
       const photoEl = document.getElementById('aboutPhoto');
-      if (photoEl && a.photo) photoEl.src = a.photo;
+      if (photoEl && a.photo) {
+        // a.photo is stored root-relative in data/about.json (e.g.
+        // "assets/projects/site/profile.jpg"), the same way every path
+        // in every data/*.json file is. That resolves fine wherever the
+        // homepage reads it (the homepage *is* the site root), but this
+        // loader also runs on /about/ — one folder below root — where
+        // setting it directly would resolve to /about/assets/... and
+        // 404. Resolving it against the site root instead fixes that;
+        // an already-absolute URL (https://...) passes through new URL()
+        // completely unchanged, so pasting a full image URL still works.
+        const siteRoot = new URL('../', window.location.href);
+        photoEl.src = new URL(a.photo, siteRoot).href;
+      }
 
       fillSkillList('softwareSkillsList', a.softwareSkills);
       fillSkillList('multimediaSkillsList', a.multimediaSkills);
