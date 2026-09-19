@@ -162,6 +162,58 @@
     .hamburger-mobile{display:flex;}
   }
   code.k{background:#0f0f0f;border:1px solid var(--line);padding:1px 6px;border-radius:4px;font-size:12px;color:#ddd;}
+
+  /* ---------- Top bar (always-visible save) ---------- */
+  #topbar{display:none;align-items:center;justify-content:space-between;gap:16px;padding:11px 20px;background:rgba(18,18,18,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:100;}
+  #topbar.active{display:flex;}
+  .topbar-left{display:flex;align-items:center;gap:10px;min-width:0;}
+  .topbar-left .dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 6px var(--good);flex-shrink:0;}
+  .topbar-left .brand{font-weight:800;color:#fff;font-size:.85rem;flex-shrink:0;}
+  .topbar-left .sep{color:#444;flex-shrink:0;}
+  .topbar-left .section-label{color:#ccc;font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .topbar-right{display:flex;align-items:center;gap:14px;flex-shrink:0;}
+  #topbar button.primary{width:auto;padding:9px 18px;}
+
+  /* ---------- Collapsible cards (hero / reviews) ---------- */
+  .collapsible-head{display:flex;align-items:center;gap:10px;cursor:pointer;}
+  .collapsible-head .preview-line{flex:1;font-size:13px;color:#bbb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .collapsible-body{overflow:hidden;transition:max-height .25s ease, opacity .2s ease;}
+
+  /* ---------- Drag reorder ---------- */
+  .drag-handle{cursor:grab;touch-action:none;}
+  .drag-handle:active{cursor:grabbing;}
+  [data-uid].dragging{opacity:.35;}
+  [data-uid].drag-target{will-change:transform;}
+
+  /* ---------- Media previews ---------- */
+  .media-preview{width:100%;aspect-ratio:16/10;background:#0a0a0a repeating-conic-gradient(#151515 0% 25%,#0a0a0a 0% 50%) 0 0/16px 16px;border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;margin-top:10px;position:relative;}
+  .media-preview img,.media-preview video{width:100%;height:100%;object-fit:cover;display:block;}
+  .media-preview .yt-badge{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.03em;}
+  .media-preview .empty-note{color:var(--text-dim);font-size:12px;text-align:center;padding:0 14px;}
+
+  /* ---------- Media Library ---------- */
+  .media-toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px;}
+  .media-toolbar .field{flex:1;min-width:200px;margin-bottom:0;}
+  .dropzone{border:1.5px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--text-dim);font-size:13px;margin-bottom:22px;transition:border-color .15s, background .15s;cursor:pointer;}
+  .dropzone.hover{border-color:#fff;background:rgba(255,255,255,.04);color:#fff;}
+  .dropzone i{font-size:22px;display:block;margin-bottom:8px;color:#666;}
+  .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
+  .media-tile{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:9px;overflow:hidden;}
+  .media-tile .thumb{width:100%;aspect-ratio:1/1;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .media-tile .thumb img,.media-tile .thumb video{width:100%;height:100%;object-fit:cover;}
+  .media-tile .thumb i{font-size:26px;color:#555;}
+  .media-tile .meta{padding:9px 10px;}
+  .media-tile .fname{font-size:11.5px;color:#ddd;word-break:break-all;line-height:1.4;max-height:2.8em;overflow:hidden;}
+  .media-tile .tile-actions{display:flex;gap:6px;padding:0 10px 10px;}
+  .media-tile .tile-actions button{flex:1;padding:6px 4px;font-size:11px;}
+  .media-folder-crumb{font-size:12.5px;color:var(--text-dim);margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+  .media-folder-crumb button{background:none;border:none;color:#8ab;font-size:12.5px;padding:0;}
+  .media-folder-crumb button:hover{text-decoration:underline;color:#fff;}
+  .folder-tile{cursor:pointer;}
+  .folder-tile .thumb{color:#999;}
+  @media (max-width:720px){
+    .topbar-left .section-label{display:none;}
+  }
 </style>
 </head>
 <body>
@@ -217,6 +269,19 @@
 <!-- ============================================================
      APP SHELL
      ============================================================ -->
+<div id="topbar">
+  <div class="topbar-left">
+    <span class="dot"></span>
+    <span class="brand">LM. CMS</span>
+    <span class="sep">/</span>
+    <span class="section-label" id="topbarSection">Hero Messages</span>
+  </div>
+  <div class="topbar-right">
+    <span class="save-status" id="saveStatus"><span class="dot"></span><span id="saveStatusText">All changes saved</span></span>
+    <button class="primary" id="btnSaveTop"><i class="fa-solid fa-cloud-arrow-up"></i>&nbsp; Save to GitHub</button>
+  </div>
+</div>
+
 <div id="app">
   <aside class="sidebar">
     <div class="sidebar-brand"><span class="dot"></span><span>LM. CMS</span></div>
@@ -231,6 +296,7 @@
 
     <div class="nav-group-label">Site</div>
     <div class="nav-item" data-section="settings"><i class="fa-solid fa-sliders"></i>Settings &amp; Toggles<span class="dirty-dot" id="dirty-settings" style="display:none"></span></div>
+    <div class="nav-item" data-section="media"><i class="fa-solid fa-folder-open"></i>Media Library</div>
     <div class="nav-item" data-section="guide"><i class="fa-solid fa-circle-info"></i>Setup Guide</div>
 
     <div class="sidebar-foot">
@@ -343,6 +409,45 @@ const GH = {
     if(res.status === 403) throw new Error('Token doesn\'t have access to this repo — check its repository access & Contents permission.');
     if(!res.ok) throw new Error(`Could not reach GitHub (error ${res.status}).`);
     return res.json();
+  },
+  async getTree(){
+    const url = `https://api.github.com/repos/${conn.owner}/${conn.repo}/git/trees/${encodeURIComponent(conn.branch)}?recursive=1`;
+    const res = await fetch(url, { headers: authHeaders() });
+    if(!res.ok){
+      const e = await res.json().catch(()=>({}));
+      throw new Error(e.message || `GitHub error ${res.status}`);
+    }
+    const data = await res.json();
+    return data.tree || [];
+  },
+  async uploadBinary(path, dataUrl, message, existingSha){
+    const base64 = dataUrl.split(',')[1]; // strip the "data:*/*;base64," prefix
+    const url = `https://api.github.com/repos/${conn.owner}/${conn.repo}/contents/${path}`;
+    const body = { message, content: base64, branch: conn.branch };
+    if (existingSha) body.sha = existingSha;
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: { ...authHeaders(), 'Content-Type':'application/json' },
+      body: JSON.stringify(body)
+    });
+    if(!res.ok){
+      const e = await res.json().catch(()=>({}));
+      throw new Error(e.message || `GitHub error ${res.status}`);
+    }
+    return res.json();
+  },
+  async deleteFile(path, sha, message){
+    const url = `https://api.github.com/repos/${conn.owner}/${conn.repo}/contents/${path}`;
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: { ...authHeaders(), 'Content-Type':'application/json' },
+      body: JSON.stringify({ message, sha, branch: conn.branch })
+    });
+    if(!res.ok){
+      const e = await res.json().catch(()=>({}));
+      throw new Error(e.message || `GitHub error ${res.status}`);
+    }
+    return res.json();
   }
 };
 
@@ -403,6 +508,7 @@ document.getElementById('btnDisconnect').addEventListener('click', () => {
 function enterApp(){
   document.getElementById('connectScreen').style.display = 'none';
   document.getElementById('app').classList.add('active');
+  document.getElementById('topbar').classList.add('active');
   document.getElementById('repoLabel').innerHTML =
     `<i class="fa-solid fa-code-branch"></i> ${conn.owner}/${conn.repo} <span style="color:#555">·</span> ${conn.branch}`;
   goToSection('hero');
@@ -441,6 +547,15 @@ function goToSection(name){
   document.querySelectorAll('.nav-item[data-section]').forEach(el=>{
     el.classList.toggle('active', el.dataset.section === name);
   });
+
+  const label = SECTIONS[name]?.label || (name === 'guide' ? 'Setup Guide' : name === 'media' ? 'Media Library' : name);
+  document.getElementById('topbarSection').textContent = label;
+  const saveBtn = document.getElementById('btnSaveTop');
+  const savable = !!SECTIONS[name];
+  saveBtn.style.display = savable ? '' : 'none';
+  document.getElementById('saveStatus').style.display = savable ? '' : 'none';
+  currentSave = null;
+
   render();
 }
 
@@ -484,6 +599,7 @@ const content = document.getElementById('content');
 
 async function render(){
   if(currentSection === 'guide'){ renderGuide(); return; }
+  if(currentSection === 'media'){ RENDERERS.media(); return; }
 
   content.innerHTML = `<div class="loading-row"><i class="fa-solid fa-circle-notch spin"></i> Loading ${SECTIONS[currentSection].label.toLowerCase()}…</div>`;
   try{
@@ -501,40 +617,56 @@ function sectionHead(title, desc, extraBtns){
         <h2>${title}</h2>
         <p>${desc}</p>
       </div>
-      <div class="head-actions">
-        ${extraBtns||''}
-        <span class="save-status" id="saveStatus"><span class="dot"></span><span id="saveStatusText">All changes saved</span></span>
-        <button class="primary" style="width:auto" id="btnSave"><i class="fa-solid fa-cloud-arrow-up"></i>&nbsp; Save to GitHub</button>
-      </div>
+      ${extraBtns ? `<div class="head-actions">${extraBtns}</div>` : ''}
     </div>`;
 }
 
+let currentSave = null; // { onCollect, name, filePath }
+
 function wireSave(onCollect, name, filePath){
-  document.getElementById('btnSave').addEventListener('click', async () => {
-    const btn = document.getElementById('btnSave');
-    let obj;
-    try{ obj = onCollect(); }
-    catch(err){ toast(err.message, true); return; }
-    btn.disabled = true;
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i>&nbsp; Saving…';
-    try{
-      await saveSection(name, obj, `CMS: update ${filePath}`);
-      toast(`Saved — ${filePath} committed to ${conn.branch}.`);
-      const s = document.getElementById('saveStatus');
-      if(s){ s.classList.add('saved'); document.getElementById('saveStatusText').textContent = 'All changes saved'; }
-    }catch(err){
-      toast(err.message, true);
-    }finally{
-      btn.disabled = false; btn.innerHTML = orig;
-    }
-  });
+  currentSave = { onCollect, name, filePath };
+  const status = document.getElementById('saveStatus');
+  const statusText = document.getElementById('saveStatusText');
+  if (dirty[name]) {
+    status.classList.remove('saved');
+    statusText.textContent = 'Unsaved changes';
+  } else {
+    status.classList.add('saved');
+    statusText.textContent = 'All changes saved';
+  }
 }
+
+document.getElementById('btnSaveTop').addEventListener('click', async () => {
+  if (!currentSave) return;
+  const { onCollect, name, filePath } = currentSave;
+  let obj;
+  try{ obj = onCollect(); }
+  catch(err){ toast(err.message, true); return; }
+
+  const btn = document.getElementById('btnSaveTop');
+  btn.disabled = true;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i>&nbsp; Saving…';
+  try{
+    await saveSection(name, obj, `CMS: update ${filePath}`);
+    toast(`Saved — ${filePath} committed to ${conn.branch}.`);
+    const status = document.getElementById('saveStatus');
+    const statusText = document.getElementById('saveStatusText');
+    status.classList.add('saved');
+    statusText.textContent = 'All changes saved';
+  }catch(err){
+    toast(err.message, true);
+  }finally{
+    btn.disabled = false; btn.innerHTML = orig;
+  }
+});
 
 function flagUnsaved(){
   markDirty();
-  const s = document.getElementById('saveStatus');
-  if(s){ s.classList.remove('saved'); document.getElementById('saveStatusText').textContent = 'Unsaved changes'; }
+  const status = document.getElementById('saveStatus');
+  const statusText = document.getElementById('saveStatusText');
+  status.classList.remove('saved');
+  statusText.textContent = 'Unsaved changes';
 }
 
 /* =====================================================================
@@ -543,13 +675,14 @@ function flagUnsaved(){
 const RENDERERS = {};
 
 RENDERERS.hero = function(data){
-  let items = (data.json || []).map(x => ({ label:x.label||'', text:x.text||'', author:x.author||'', source:x.source||'', weight: (x.weight===undefined||x.weight===null)?1:x.weight }));
+  let items = withUids((data.json || []).map(x => ({ label:x.label||'', text:x.text||'', author:x.author||'', source:x.source||'', weight: (x.weight===undefined||x.weight===null)?1:x.weight })));
   const MAX = 180;
+  let openUid = null;
 
   function paint(){
     content.innerHTML = sectionHead(
       'Hero Messages',
-      'Rotates at random on every homepage load. Leave any field but the statement blank and that line simply won\'t render.'
+      'Rotates at random on every homepage load. Leave any field but the statement blank and that line simply won\'t render. Drag the handle to reorder, or click a card to expand it.'
     ) + `
       <div class="banner info"><i class="fa-solid fa-dice"></i><div>
         <strong>Rarity / weight</strong> — the number next to each message controls how often it's picked.
@@ -562,68 +695,104 @@ RENDERERS.hero = function(data){
     if(!items.length){
       list.innerHTML = `<div class="banner muted">No hero messages yet — add one below.</div>`;
     }
-    items.forEach((item, i) => {
+    items.forEach((item) => {
       const over = item.text.length > MAX;
+      const isOpen = item._uid === openUid;
       const card = document.createElement('div');
       card.className = 'card-item';
+      card.dataset.uid = item._uid;
+      const preview = (item.label ? item.label + ' — ' : '') + (item.text || '(empty)');
       card.innerHTML = `
-        <div class="card-item-head">
-          <span class="item-title">Message ${i+1}${item.label ? ' — ' + esc(item.label) : ''}</span>
+        <div class="card-item-head collapsible-head" data-toggle-open>
+          <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+          <span class="preview-line">${esc(preview)}</span>
           <div class="card-item-actions">
             <button class="icon-btn" data-act="up" title="Move up"><i class="fa-solid fa-arrow-up"></i></button>
             <button class="icon-btn" data-act="down" title="Move down"><i class="fa-solid fa-arrow-down"></i></button>
             <button class="icon-btn" data-act="dup" title="Duplicate"><i class="fa-solid fa-copy"></i></button>
             <button class="icon-btn" data-act="del" title="Delete" style="color:#e0584f"><i class="fa-solid fa-trash"></i></button>
+            <button class="icon-btn" data-act="toggle"><i class="fa-solid fa-chevron-${isOpen?'up':'down'}"></i></button>
           </div>
         </div>
-        <div class="row">
-          <div class="field"><label class="field-label">Label <span style="opacity:.5">(optional)</span></label><input data-f="label" value="${attr(item.label)}" placeholder="e.g. On design"></div>
-          <div class="field" style="max-width:130px"><label class="field-label">Weight</label><input data-f="weight" type="number" min="0" step="0.1" value="${item.weight}"></div>
-        </div>
-        <div class="field">
-          <label class="field-label">Statement</label>
-          <textarea data-f="text" rows="3" placeholder="The statement itself…">${esc(item.text)}</textarea>
-          <div class="charcount ${over?'over':''}" data-cc>${item.text.length} / ${MAX}${over?' — over the limit, will be trimmed on the site':''}</div>
-        </div>
-        <div class="row">
-          <div class="field"><label class="field-label">Author <span style="opacity:.5">(optional)</span></label><input data-f="author" value="${attr(item.author)}" placeholder="e.g. Donald A. Norman"></div>
-          <div class="field"><label class="field-label">Source <span style="opacity:.5">(optional)</span></label><input data-f="source" value="${attr(item.source)}" placeholder="e.g. The Design of Everyday Things"></div>
-        </div>
+        <div class="collapsible-body" style="display:${isOpen?'block':'none'};margin-top:16px;" data-body></div>
       `;
-      card.querySelectorAll('[data-f]').forEach(inp=>{
-        inp.addEventListener('input', ()=>{
-          const f = inp.dataset.f;
-          items[i][f] = f==='weight' ? (parseFloat(inp.value)||0) : inp.value;
-          if(f==='text'){
-            const cc = card.querySelector('[data-cc]');
-            const len = inp.value.length;
-            cc.textContent = `${len} / ${MAX}${len>MAX?' — over the limit, will be trimmed on the site':''}`;
-            cc.classList.toggle('over', len>MAX);
-          }
-          flagUnsaved();
-        });
+      if (isOpen) buildHeroBody(card.querySelector('[data-body]'), item, over);
+
+      card.querySelector('[data-toggle-open]').addEventListener('click', (e)=>{
+        if(e.target.closest('[data-act]') && e.target.closest('[data-act]').dataset.act !== 'toggle') return;
+        openUid = isOpen ? null : item._uid; paint();
       });
-      card.querySelector('[data-act="del"]').addEventListener('click', ()=>{
+      card.querySelector('[data-act="del"]').addEventListener('click', (e)=>{
+        e.stopPropagation();
         if(!confirm('Delete this message?')) return;
-        items.splice(i,1); flagUnsaved(); paint();
+        items = items.filter(x => x._uid !== item._uid); flagUnsaved(); paint();
       });
-      card.querySelector('[data-act="dup"]').addEventListener('click', ()=>{
-        items.splice(i+1,0,{...item}); flagUnsaved(); paint();
+      card.querySelector('[data-act="dup"]').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const i = items.indexOf(item);
+        items.splice(i+1,0,{...item, _uid: uid()}); flagUnsaved(); paint();
       });
-      card.querySelector('[data-act="up"]').addEventListener('click', ()=>{
-        if(i===0) return; [items[i-1],items[i]]=[items[i],items[i-1]]; flagUnsaved(); paint();
+      card.querySelector('[data-act="up"]').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const i = items.indexOf(item);
+        if(i===0) return;
+        animateReorder(() => document.getElementById('heroList'), () => { [items[i-1],items[i]]=[items[i],items[i-1]]; flagUnsaved(); paint(); });
       });
-      card.querySelector('[data-act="down"]').addEventListener('click', ()=>{
-        if(i===items.length-1) return; [items[i+1],items[i]]=[items[i],items[i+1]]; flagUnsaved(); paint();
+      card.querySelector('[data-act="down"]').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const i = items.indexOf(item);
+        if(i===items.length-1) return;
+        animateReorder(() => document.getElementById('heroList'), () => { [items[i+1],items[i]]=[items[i],items[i+1]]; flagUnsaved(); paint(); });
       });
       list.appendChild(card);
     });
     document.getElementById('addHero').addEventListener('click', ()=>{
-      items.push({label:'',text:'',author:'',source:'',weight:1});
+      items.push({label:'',text:'',author:'',source:'',weight:1,_uid:uid()});
+      openUid = items[items.length-1]._uid;
       flagUnsaved(); paint();
     });
+    enableDragReorder(() => document.getElementById('heroList'), items, flagUnsaved, paint);
     wireSave(()=> items.map(x=>({label:x.label,text:x.text,author:x.author,source:x.source,weight:x.weight})), 'hero', SECTIONS.hero.file);
   }
+
+  function buildHeroBody(el, item, over){
+    el.innerHTML = `
+      <div class="row">
+        <div class="field"><label class="field-label">Label <span style="opacity:.5">(optional)</span></label><input data-f="label" value="${attr(item.label)}" placeholder="e.g. On design"></div>
+        <div class="field" style="max-width:130px"><label class="field-label">Weight</label><input data-f="weight" type="number" min="0" step="0.1" value="${item.weight}"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">Statement</label>
+        <textarea data-f="text" rows="3" placeholder="The statement itself…">${esc(item.text)}</textarea>
+        <div class="charcount ${over?'over':''}" data-cc>${item.text.length} / ${MAX}${over?' — over the limit, will be trimmed on the site':''}</div>
+      </div>
+      <div class="row">
+        <div class="field"><label class="field-label">Author <span style="opacity:.5">(optional)</span></label><input data-f="author" value="${attr(item.author)}" placeholder="e.g. Donald A. Norman"></div>
+        <div class="field"><label class="field-label">Source <span style="opacity:.5">(optional)</span></label><input data-f="source" value="${attr(item.source)}" placeholder="e.g. The Design of Everyday Things"></div>
+      </div>
+    `;
+    const MAX = 180;
+    el.querySelectorAll('[data-f]').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        const f = inp.dataset.f;
+        item[f] = f==='weight' ? (parseFloat(inp.value)||0) : inp.value;
+        if(f==='text'){
+          const cc = el.querySelector('[data-cc]');
+          const len = inp.value.length;
+          cc.textContent = `${len} / ${MAX}${len>MAX?' — over the limit, will be trimmed on the site':''}`;
+          cc.classList.toggle('over', len>MAX);
+          const preview = el.closest('.card-item').querySelector('.preview-line');
+          if (preview) preview.textContent = (item.label ? item.label + ' — ' : '') + (item.text || '(empty)');
+        }
+        if(f==='label'){
+          const preview = el.closest('.card-item').querySelector('.preview-line');
+          if (preview) preview.textContent = (item.label ? item.label + ' — ' : '') + (item.text || '(empty)');
+        }
+        flagUnsaved();
+      });
+    });
+  }
+
   paint();
 };
 
@@ -631,12 +800,12 @@ RENDERERS.hero = function(data){
    8. SECTION: FILTERS & BADGES
    ===================================================================== */
 RENDERERS.filters = function(data){
-  let items = (data.json || []).map(x=>({id:x.id||'', label:x.label||''}));
+  let items = withUids((data.json || []).map(x=>({id:x.id||'', label:x.label||''})));
 
   function paint(){
     content.innerHTML = sectionHead(
       'Filters & Badges',
-      'These become the tabs above the project grid, the matching nav-bar dropdown items, and the badge options for each project.'
+      'These become the tabs above the project grid, the matching nav-bar dropdown items, and the badge options for each project. Drag the handle to reorder.'
     ) + `
       <div class="banner info"><i class="fa-solid fa-circle-info"></i><div>
         The <strong>ALL</strong> tab always exists automatically and isn't listed here — every project belongs to it.
@@ -647,13 +816,14 @@ RENDERERS.filters = function(data){
       <button class="add-btn" id="addFilter"><i class="fa-solid fa-plus"></i> Add filter tab</button>
     `;
     const list = document.getElementById('filterList');
-    items.forEach((item,i)=>{
+    items.forEach((item)=>{
       const row = document.createElement('div');
       row.className = 'card-item';
+      row.dataset.uid = item._uid;
       row.innerHTML = `
         <div class="card-item-head">
           <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
-          <span class="item-title">Tab ${i+1}</span>
+          <span class="item-title">${esc(item.label) || 'New tab'}</span>
           <div class="card-item-actions">
             <button class="icon-btn" data-act="up"><i class="fa-solid fa-arrow-up"></i></button>
             <button class="icon-btn" data-act="down"><i class="fa-solid fa-arrow-down"></i></button>
@@ -666,20 +836,31 @@ RENDERERS.filters = function(data){
         </div>
       `;
       row.querySelectorAll('[data-f]').forEach(inp=>{
-        inp.addEventListener('input', ()=>{ items[i][inp.dataset.f]=inp.value; flagUnsaved(); });
+        inp.addEventListener('input', ()=>{
+          item[inp.dataset.f]=inp.value;
+          if (inp.dataset.f === 'label') row.querySelector('.item-title').textContent = item.label || 'New tab';
+          flagUnsaved();
+        });
       });
       row.querySelector('[data-act="del"]').addEventListener('click', ()=>{
         if(!confirm('Delete this filter tab? Projects tagged with it will need re-tagging.')) return;
-        items.splice(i,1); flagUnsaved(); paint();
+        items = items.filter(x=>x._uid!==item._uid); flagUnsaved(); paint();
       });
-      row.querySelector('[data-act="up"]').addEventListener('click', ()=>{ if(i===0) return; [items[i-1],items[i]]=[items[i],items[i-1]]; flagUnsaved(); paint(); });
-      row.querySelector('[data-act="down"]').addEventListener('click', ()=>{ if(i===items.length-1) return; [items[i+1],items[i]]=[items[i],items[i+1]]; flagUnsaved(); paint(); });
+      row.querySelector('[data-act="up"]').addEventListener('click', ()=>{
+        const i = items.indexOf(item); if(i===0) return;
+        animateReorder(() => document.getElementById('filterList'), () => { [items[i-1],items[i]]=[items[i],items[i-1]]; flagUnsaved(); paint(); });
+      });
+      row.querySelector('[data-act="down"]').addEventListener('click', ()=>{
+        const i = items.indexOf(item); if(i===items.length-1) return;
+        animateReorder(() => document.getElementById('filterList'), () => { [items[i+1],items[i]]=[items[i],items[i+1]]; flagUnsaved(); paint(); });
+      });
       list.appendChild(row);
     });
-    document.getElementById('addFilter').addEventListener('click', ()=>{ items.push({id:'',label:''}); flagUnsaved(); paint(); });
+    document.getElementById('addFilter').addEventListener('click', ()=>{ items.push({id:'',label:'',_uid:uid()}); flagUnsaved(); paint(); });
+    enableDragReorder(() => document.getElementById('filterList'), items, flagUnsaved, paint);
     wireSave(()=>{
       for(const it of items){ if(!it.id.trim()||!it.label.trim()) throw new Error('Every filter needs both an ID and a label.'); }
-      return items;
+      return items.map(x=>({id:x.id,label:x.label}));
     }, 'filters', SECTIONS.filters.file);
   }
   paint();
@@ -791,12 +972,13 @@ RENDERERS.settings = function(data){
    10. SECTION: REVIEWS
    ===================================================================== */
 RENDERERS.reviews = async function(data){
-  let items = (data.json||[]).map(x=>({stars:x.stars||5, quote:x.quote||'', author:x.author||''}));
+  let items = withUids((data.json||[]).map(x=>({stars:x.stars||5, quote:x.quote||'', author:x.author||''})));
   let showReviews = true;
+  let openUid = null;
   try{ const set = await loadSection('settings'); showReviews = !!(set.json && set.json.showReviews); }catch(e){}
 
   function paint(){
-    content.innerHTML = sectionHead('Reviews','Client testimonials in the scrolling strip above the footer.') +
+    content.innerHTML = sectionHead('Reviews','Client testimonials in the scrolling strip above the footer. Drag the handle to reorder, or click a card to expand it.') +
       (!showReviews ? `<div class="banner info"><i class="fa-solid fa-eye-slash"></i><div><strong>The reviews section is currently hidden</strong> on the live site. Turn it on from <a href="#" id="goSettings" style="color:#fff;text-decoration:underline">Settings &amp; Toggles</a> when you're ready to show it.</div></div>` : '') +
       `<div id="reviewList"></div>
       <button class="add-btn" id="addReview"><i class="fa-solid fa-plus"></i> Add review</button>`;
@@ -805,70 +987,141 @@ RENDERERS.reviews = async function(data){
     if(gs) gs.addEventListener('click', (e)=>{ e.preventDefault(); goToSection('settings'); });
 
     const list = document.getElementById('reviewList');
-    items.forEach((item,i)=>{
+    items.forEach((item)=>{
+      const isOpen = item._uid === openUid;
       const row = document.createElement('div');
       row.className = 'card-item';
+      row.dataset.uid = item._uid;
+      const stars = '★'.repeat(Math.max(0,Math.min(5,Math.round(item.stars||0))));
+      const preview = `${stars}  ${item.quote || '(empty)'}${item.author ? ' — ' + item.author : ''}`;
       row.innerHTML = `
-        <div class="card-item-head">
-          <span class="item-title">Review ${i+1}${item.author?' — '+esc(item.author):''}</span>
+        <div class="card-item-head collapsible-head" data-toggle-open>
+          <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+          <span class="preview-line">${esc(preview)}</span>
           <div class="card-item-actions">
             <button class="icon-btn" data-act="up"><i class="fa-solid fa-arrow-up"></i></button>
             <button class="icon-btn" data-act="down"><i class="fa-solid fa-arrow-down"></i></button>
             <button class="icon-btn" data-act="del" style="color:#e0584f"><i class="fa-solid fa-trash"></i></button>
+            <button class="icon-btn" data-act="toggle"><i class="fa-solid fa-chevron-${isOpen?'up':'down'}"></i></button>
           </div>
         </div>
-        <div class="field"><label class="field-label">Rating</label>
-          <div class="stars-input" data-stars>${[1,2,3,4,5].map(n=>`<i class="fa-solid fa-star" data-n="${n}"></i>`).join('')}</div>
-        </div>
-        <div class="field"><label class="field-label">Quote</label><textarea data-f="quote" rows="2">${esc(item.quote)}</textarea></div>
-        <div class="field"><label class="field-label">Author</label><input data-f="author" value="${attr(item.author)}" placeholder="e.g. Studio A"></div>
+        <div class="collapsible-body" style="display:${isOpen?'block':'none'};margin-top:16px;" data-body></div>
       `;
-      const starEls = row.querySelectorAll('[data-stars] i');
-      function paintStars(){ starEls.forEach(se=> se.classList.toggle('filled', +se.dataset.n <= item.stars)); }
-      paintStars();
-      starEls.forEach(se=> se.addEventListener('click', ()=>{ item.stars = +se.dataset.n; paintStars(); flagUnsaved(); }));
-      row.querySelectorAll('[data-f]').forEach(inp=> inp.addEventListener('input', ()=>{ item[inp.dataset.f]=inp.value; flagUnsaved(); }));
-      row.querySelector('[data-act="del"]').addEventListener('click', ()=>{ if(!confirm('Delete this review?'))return; items.splice(i,1); flagUnsaved(); paint(); });
-      row.querySelector('[data-act="up"]').addEventListener('click', ()=>{ if(i===0)return; [items[i-1],items[i]]=[items[i],items[i-1]]; flagUnsaved(); paint(); });
-      row.querySelector('[data-act="down"]').addEventListener('click', ()=>{ if(i===items.length-1)return; [items[i+1],items[i]]=[items[i],items[i+1]]; flagUnsaved(); paint(); });
+      if (isOpen) buildReviewBody(row.querySelector('[data-body]'), item, row);
+
+      row.querySelector('[data-toggle-open]').addEventListener('click', (e)=>{
+        if(e.target.closest('[data-act]') && e.target.closest('[data-act]').dataset.act !== 'toggle') return;
+        openUid = isOpen ? null : item._uid; paint();
+      });
+      row.querySelector('[data-act="del"]').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        if(!confirm('Delete this review?'))return;
+        items = items.filter(x=>x._uid!==item._uid); flagUnsaved(); paint();
+      });
+      row.querySelector('[data-act="up"]').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const i = items.indexOf(item);
+        if(i===0)return;
+        animateReorder(() => document.getElementById('reviewList'), () => { [items[i-1],items[i]]=[items[i],items[i-1]]; flagUnsaved(); paint(); });
+      });
+      row.querySelector('[data-act="down"]').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const i = items.indexOf(item);
+        if(i===items.length-1)return;
+        animateReorder(() => document.getElementById('reviewList'), () => { [items[i+1],items[i]]=[items[i],items[i+1]]; flagUnsaved(); paint(); });
+      });
       list.appendChild(row);
     });
-    document.getElementById('addReview').addEventListener('click', ()=>{ items.push({stars:5,quote:'',author:''}); flagUnsaved(); paint(); });
+    document.getElementById('addReview').addEventListener('click', ()=>{
+      const item = {stars:5,quote:'',author:'',_uid:uid()};
+      items.push(item); openUid = item._uid; flagUnsaved(); paint();
+    });
+    enableDragReorder(() => document.getElementById('reviewList'), items, flagUnsaved, paint);
     wireSave(()=> items.map(x=>({stars:x.stars,quote:x.quote,author:x.author})), 'reviews', SECTIONS.reviews.file);
   }
+
+  function buildReviewBody(el, item, row){
+    el.innerHTML = `
+      <div class="field"><label class="field-label">Rating</label>
+        <div class="stars-input" data-stars>${[1,2,3,4,5].map(n=>`<i class="fa-solid fa-star" data-n="${n}"></i>`).join('')}</div>
+      </div>
+      <div class="field"><label class="field-label">Quote</label><textarea data-f="quote" rows="2">${esc(item.quote)}</textarea></div>
+      <div class="field"><label class="field-label">Author</label><input data-f="author" value="${attr(item.author)}" placeholder="e.g. Studio A"></div>
+    `;
+    function updatePreview(){
+      const stars = '★'.repeat(Math.max(0,Math.min(5,Math.round(item.stars||0))));
+      const preview = row.querySelector('.preview-line');
+      if (preview) preview.textContent = `${stars}  ${item.quote || '(empty)'}${item.author ? ' — ' + item.author : ''}`;
+    }
+    const starEls = el.querySelectorAll('[data-stars] i');
+    function paintStars(){ starEls.forEach(se=> se.classList.toggle('filled', +se.dataset.n <= item.stars)); }
+    paintStars();
+    starEls.forEach(se=> se.addEventListener('click', ()=>{ item.stars = +se.dataset.n; paintStars(); updatePreview(); flagUnsaved(); }));
+    el.querySelectorAll('[data-f]').forEach(inp=> inp.addEventListener('input', ()=>{ item[inp.dataset.f]=inp.value; updatePreview(); flagUnsaved(); }));
+  }
+
   paint();
 };
 
-/* =====================================================================
-   11. SECTION: PROJECTS  (the big one)
-   ===================================================================== */
+function extractYouTubeId(url){
+  if (!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/shorts\/)([\w-]{11})/,
+    /(?:youtube\.com\/watch\?v=)([\w-]{11})/,
+    /(?:youtu\.be\/)([\w-]{11})/,
+    /(?:youtube\.com\/embed\/)([\w-]{11})/
+  ];
+  for (const re of patterns) {
+    const m = url.match(re);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+function buildMediaPreviewHtml(m){
+  if (!m.src) {
+    return `<div class="media-preview"><span class="empty-note">Enter a source above to see a preview</span></div>`;
+  }
+  if (m.type === 'video') {
+    return `<div class="media-preview"><video src="${attr(m.src)}" muted preload="metadata" controls onerror="this.closest('.media-preview').innerHTML='&lt;span class=&quot;empty-note&quot;&gt;Couldn\\'t load this video — check the path&lt;/span&gt;'"></video></div>`;
+  }
+  if (m.type === 'youtube') {
+    const id = extractYouTubeId(m.src);
+    if (!id) return `<div class="media-preview"><span class="empty-note">Couldn't recognize this as a YouTube link</span></div>`;
+    return `<div class="media-preview"><img src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="YouTube thumbnail"><span class="yt-badge">YOUTUBE</span></div>`;
+  }
+  // image
+  return `<div class="media-preview"><img src="${attr(m.src)}" alt="" onerror="this.closest('.media-preview').innerHTML='&lt;span class=&quot;empty-note&quot;&gt;Couldn\\'t load this image — check the path&lt;/span&gt;'"></div>`;
+}
+
 RENDERERS.projects = async function(data){
-  let items = (data.json||[]).map(p=>({
+  let items = withUids((data.json||[]).map(p=>({
     id:p.id||slugify(p.title||''), title:p.title||'', subtitle:p.subtitle||'', badge:p.badge||'',
     filters:Array.isArray(p.filters)?[...p.filters]:[], description:p.description||'',
     thumbnail:{ src:(p.thumbnail&&p.thumbnail.src)||'', focus:(p.thumbnail&&p.thumbnail.focus)||'50% 50%', zoom:(p.thumbnail&&p.thumbnail.zoom)||1 },
-    media:Array.isArray(p.media)?p.media.map(m=>({type:m.type||'image',src:m.src||'',caption:m.caption||'',orientation:m.orientation||''})):[]
-  }));
+    media:withUids(Array.isArray(p.media)?p.media.map(m=>({type:m.type||'image',src:m.src||'',caption:m.caption||'',orientation:m.orientation||''})):[])
+  })));
   let filterDefs = [];
   try{ const f = await loadSection('filters'); filterDefs = f.json||[]; }catch(e){}
-  let openIndex = items.length ? 0 : null;
+  let openUid = items.length ? items[0]._uid : null;
 
   function paint(){
-    content.innerHTML = sectionHead('Projects', 'Order here is the order on the page. Click a project to expand and edit it.') + `
+    content.innerHTML = sectionHead('Projects', 'Order here is the order on the page. Drag the handle to reorder, or click a project to expand and edit it.') + `
       <div id="projList"></div>
       <button class="add-btn" id="addProj"><i class="fa-solid fa-plus"></i> Add project</button>
     `;
     const list = document.getElementById('projList');
     if(!items.length) list.innerHTML = `<div class="banner muted">No projects yet — add one below.</div>`;
 
-    items.forEach((p,i)=>{
+    items.forEach((p)=>{
       const wrap = document.createElement('div');
       wrap.className = 'card-item';
-      const isOpen = i===openIndex;
+      wrap.dataset.uid = p._uid;
+      const isOpen = p._uid===openUid;
       wrap.innerHTML = `
         <div class="card-item-head" style="cursor:pointer" data-toggle-open>
           <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
-          <span class="item-title">${i+1}. ${esc(p.title)||'(untitled project)'} ${p.badge?`<span style="color:#666;font-weight:500"> — ${esc(p.badge)}</span>`:''}</span>
+          <span class="item-title">${esc(p.title)||'(untitled project)'} ${p.badge?`<span style="color:#666;font-weight:500"> — ${esc(p.badge)}</span>`:''}</span>
           <div class="card-item-actions">
             <button class="icon-btn" data-act="up" title="Move up"><i class="fa-solid fa-arrow-up"></i></button>
             <button class="icon-btn" data-act="down" title="Move down"><i class="fa-solid fa-arrow-down"></i></button>
@@ -880,20 +1133,34 @@ RENDERERS.projects = async function(data){
       `;
       wrap.querySelector('[data-toggle-open]').addEventListener('click', (e)=>{
         if(e.target.closest('[data-act]') && e.target.closest('[data-act]').dataset.act !== 'toggle') return;
-        openIndex = isOpen ? null : i; paint();
+        openUid = isOpen ? null : p._uid; paint();
       });
-      wrap.querySelector('[data-act="del"]').addEventListener('click',(e)=>{ e.stopPropagation(); if(!confirm(`Delete "${p.title||'this project'}"?`))return; items.splice(i,1); if(openIndex===i)openIndex=null; flagUnsaved(); paint(); });
-      wrap.querySelector('[data-act="up"]').addEventListener('click',(e)=>{ e.stopPropagation(); if(i===0)return; [items[i-1],items[i]]=[items[i],items[i-1]]; flagUnsaved(); paint(); });
-      wrap.querySelector('[data-act="down"]').addEventListener('click',(e)=>{ e.stopPropagation(); if(i===items.length-1)return; [items[i+1],items[i]]=[items[i],items[i+1]]; flagUnsaved(); paint(); });
+      wrap.querySelector('[data-act="del"]').addEventListener('click',(e)=>{
+        e.stopPropagation();
+        if(!confirm(`Delete "${p.title||'this project'}"?`))return;
+        items = items.filter(x=>x._uid!==p._uid); if(openUid===p._uid)openUid=null; flagUnsaved(); paint();
+      });
+      wrap.querySelector('[data-act="up"]').addEventListener('click',(e)=>{
+        e.stopPropagation();
+        const i = items.indexOf(p); if(i===0)return;
+        animateReorder(() => document.getElementById('projList'), () => { [items[i-1],items[i]]=[items[i],items[i-1]]; flagUnsaved(); paint(); });
+      });
+      wrap.querySelector('[data-act="down"]').addEventListener('click',(e)=>{
+        e.stopPropagation();
+        const i = items.indexOf(p); if(i===items.length-1)return;
+        animateReorder(() => document.getElementById('projList'), () => { [items[i+1],items[i]]=[items[i],items[i+1]]; flagUnsaved(); paint(); });
+      });
 
-      if(isOpen) buildProjectBody(wrap.querySelector('[data-body]'), p, i);
+      if(isOpen) buildProjectBody(wrap.querySelector('[data-body]'), p);
       list.appendChild(wrap);
     });
 
     document.getElementById('addProj').addEventListener('click', ()=>{
-      items.push({id:'',title:'',subtitle:'',badge:'',filters:[],description:'',thumbnail:{src:'',focus:'50% 50%',zoom:1},media:[]});
-      openIndex = items.length-1; flagUnsaved(); paint();
+      const p = {id:'',title:'',subtitle:'',badge:'',filters:[],description:'',thumbnail:{src:'',focus:'50% 50%',zoom:1},media:[],_uid:uid()};
+      items.push(p);
+      openUid = p._uid; flagUnsaved(); paint();
     });
+    enableDragReorder(() => document.getElementById('projList'), items, flagUnsaved, paint);
 
     wireSave(()=>{
       for(const p of items){
@@ -902,11 +1169,15 @@ RENDERERS.projects = async function(data){
         if(!p.filters.length) throw new Error(`"${p.title}" needs at least one filter tab.`);
         if(!p.id) p.id = slugify(p.title);
       }
-      return items;
+      return items.map(p=>({
+        id:p.id, title:p.title, subtitle:p.subtitle, badge:p.badge, filters:p.filters, description:p.description,
+        thumbnail:{src:p.thumbnail.src,focus:p.thumbnail.focus,zoom:p.thumbnail.zoom},
+        media:p.media.map(m=>({type:m.type,src:m.src,caption:m.caption,orientation:m.orientation}))
+      }));
     }, 'projects', SECTIONS.projects.file);
   }
 
-  function buildProjectBody(el, p, i){
+  function buildProjectBody(el, p){
     el.innerHTML = `
       <div class="row">
         <div class="field"><label class="field-label">Title</label><input data-f="title" value="${attr(p.title)}"></div>
@@ -944,7 +1215,7 @@ RENDERERS.projects = async function(data){
           <div>
             <label class="field-label">Drag to set focus point</label>
             <div class="focus-picker" data-focuspicker>
-              ${p.thumbnail.src ? `<img src="${attr(p.thumbnail.src)}" onerror="this.style.display='none'">` : ''}
+              ${p.thumbnail.src ? `<img src="${attr(p.thumbnail.src)}" data-thumb-img onerror="this.style.display='none'">` : `<img data-thumb-img style="display:none">`}
               <div class="focus-crosshair" data-crosshair></div>
             </div>
           </div>
@@ -953,7 +1224,7 @@ RENDERERS.projects = async function(data){
 
       <div class="panel" style="background:#141414;">
         <h3 style="font-size:.85rem">Media (lightbox gallery)</h3>
-        <p class="panel-sub">Order here is the order in the lightbox.</p>
+        <p class="panel-sub">Order here is the order in the lightbox. Drag the handle to reorder.</p>
         <div data-medialist></div>
         <button class="add-btn" data-addmedia type="button"><i class="fa-solid fa-plus"></i> Add media item</button>
       </div>
@@ -963,12 +1234,26 @@ RENDERERS.projects = async function(data){
     el.querySelectorAll('[data-f]').forEach(inp=>{
       inp.addEventListener('input', ()=>{
         const f = inp.dataset.f;
-        if(f==='thumb-src') p.thumbnail.src = inp.value;
+        if(f==='thumb-src'){
+          p.thumbnail.src = inp.value;
+          const img = el.querySelector('[data-thumb-img]');
+          if (img) { img.style.display = inp.value ? '' : 'none'; img.src = inp.value; }
+        }
         else if(f==='thumb-zoom') p.thumbnail.zoom = parseFloat(inp.value)||1;
-        else if(f==='thumb-focus') p.thumbnail.focus = inp.value;
-        else p[f] = inp.value;
+        else if(f==='thumb-focus'){ p.thumbnail.focus = inp.value; setFromFocusStr(); }
+        else {
+          p[f] = inp.value;
+          if (f==='title' || f==='badge') {
+            const titleEl = el.closest('.card-item').querySelector('.item-title');
+            titleEl.innerHTML = `${esc(p.title)||'(untitled project)'} ${p.badge?`<span style="color:#666;font-weight:500"> — ${esc(p.badge)}</span>`:''}`;
+          }
+        }
         flagUnsaved();
       });
+    });
+    el.querySelector('select[data-f="badge"]').addEventListener('change', function(){
+      const titleEl = el.closest('.card-item').querySelector('.item-title');
+      titleEl.innerHTML = `${esc(p.title)||'(untitled project)'} ${p.badge?`<span style="color:#666;font-weight:500"> — ${esc(p.badge)}</span>`:''}`;
     });
 
     // filter chips
@@ -1010,16 +1295,19 @@ RENDERERS.projects = async function(data){
     picker.addEventListener('touchmove', e=>{ pointerToFocus(e); }, {passive:true});
 
     // media list
-    const medWrap = el.querySelector('[data-medialist]');
+    let medWrap = el.querySelector('[data-medialist]');
     function paintMedia(){
-      medWrap.innerHTML = '';
-      p.media.forEach((m,mi)=>{
+      const freshWrap = document.createElement('div');
+      freshWrap.setAttribute('data-medialist', '');
+      p.media.forEach((m)=>{
         const row = document.createElement('div');
         row.className = 'card-item';
         row.style.background = '#191919';
+        row.dataset.uid = m._uid;
         row.innerHTML = `
           <div class="card-item-head">
-            <span class="item-title">Media ${mi+1}</span>
+            <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+            <span class="item-title">${m.caption ? esc(m.caption) : '(' + m.type + ')'}</span>
             <div class="card-item-actions">
               <button class="icon-btn" data-mact="up"><i class="fa-solid fa-arrow-up"></i></button>
               <button class="icon-btn" data-mact="down"><i class="fa-solid fa-arrow-down"></i></button>
@@ -1047,16 +1335,42 @@ RENDERERS.projects = async function(data){
               </select>
             </div>
           </div>
+          <div data-mediapreview></div>
         `;
-        row.querySelectorAll('[data-mf]').forEach(inp=> inp.addEventListener('input', ()=>{ m[inp.dataset.mf]=inp.value; flagUnsaved(); }));
-        row.querySelector('[data-mact="del"]').addEventListener('click', ()=>{ p.media.splice(mi,1); flagUnsaved(); paintMedia(); });
-        row.querySelector('[data-mact="up"]').addEventListener('click', ()=>{ if(mi===0)return; [p.media[mi-1],p.media[mi]]=[p.media[mi],p.media[mi-1]]; flagUnsaved(); paintMedia(); });
-        row.querySelector('[data-mact="down"]').addEventListener('click', ()=>{ if(mi===p.media.length-1)return; [p.media[mi+1],p.media[mi]]=[p.media[mi],p.media[mi+1]]; flagUnsaved(); paintMedia(); });
-        medWrap.appendChild(row);
+        const previewEl = row.querySelector('[data-mediapreview]');
+        function refreshPreview(){ previewEl.innerHTML = buildMediaPreviewHtml(m); }
+        refreshPreview();
+
+        row.querySelectorAll('[data-mf]').forEach(inp=> inp.addEventListener('input', ()=>{
+          m[inp.dataset.mf]=inp.value;
+          if (inp.dataset.mf === 'caption') row.querySelector('.item-title').textContent = m.caption || '(' + m.type + ')';
+          if (inp.dataset.mf === 'type' || inp.dataset.mf === 'src') refreshPreview();
+          flagUnsaved();
+        }));
+        row.querySelectorAll('[data-mf]').forEach(inp=> inp.addEventListener('change', ()=>{
+          if (inp.dataset.mf === 'type') { row.querySelector('.item-title').textContent = m.caption || '(' + m.type + ')'; refreshPreview(); }
+        }));
+        row.querySelector('[data-mact="del"]').addEventListener('click', ()=>{
+          const idx = p.media.findIndex(x=>x._uid===m._uid);
+          if (idx > -1) p.media.splice(idx, 1);
+          flagUnsaved(); paintMedia();
+        });
+        row.querySelector('[data-mact="up"]').addEventListener('click', ()=>{
+          const mi = p.media.indexOf(m); if(mi===0)return;
+          animateReorder(() => el.querySelector('[data-medialist]'), () => { [p.media[mi-1],p.media[mi]]=[p.media[mi],p.media[mi-1]]; flagUnsaved(); paintMedia(); });
+        });
+        row.querySelector('[data-mact="down"]').addEventListener('click', ()=>{
+          const mi = p.media.indexOf(m); if(mi===p.media.length-1)return;
+          animateReorder(() => el.querySelector('[data-medialist]'), () => { [p.media[mi+1],p.media[mi]]=[p.media[mi],p.media[mi+1]]; flagUnsaved(); paintMedia(); });
+        });
+        freshWrap.appendChild(row);
       });
+      medWrap.replaceWith(freshWrap);
+      medWrap = freshWrap;
+      enableDragReorder(() => el.querySelector('[data-medialist]'), p.media, flagUnsaved, paintMedia);
     }
     paintMedia();
-    el.querySelector('[data-addmedia]').addEventListener('click', ()=>{ p.media.push({type:'image',src:'',caption:'',orientation:''}); flagUnsaved(); paintMedia(); });
+    el.querySelector('[data-addmedia]').addEventListener('click', ()=>{ p.media.push({type:'image',src:'',caption:'',orientation:'',_uid:uid()}); flagUnsaved(); paintMedia(); });
   }
 
   function badgeOptions(current){
@@ -1243,12 +1557,191 @@ RENDERERS.about = function(data){
 };
 
 /* =====================================================================
-   13. SETUP GUIDE
+   13. MEDIA LIBRARY
+   ===================================================================== */
+let mediaTreeCache = null; // raw flat tree from GitHub, refetched on demand
+let mediaCurrentPath = 'assets';
+
+async function loadMediaTree(force){
+  if (mediaTreeCache && !force) return mediaTreeCache;
+  mediaTreeCache = await GH.getTree();
+  return mediaTreeCache;
+}
+
+function fileKind(path){
+  const ext = (path.split('.').pop() || '').toLowerCase();
+  if (['jpg','jpeg','png','gif','webp','svg','avif'].includes(ext)) return 'image';
+  if (['mp4','webm','mov','m4v'].includes(ext)) return 'video';
+  return 'other';
+}
+
+RENDERERS.media = async function(){
+  content.innerHTML = `<div class="loading-row"><i class="fa-solid fa-circle-notch spin"></i> Loading your files…</div>`;
+  let tree;
+  try{ tree = await loadMediaTree(false); }
+  catch(err){
+    content.innerHTML = `<div class="content-head"><div><h2>Media Library</h2></div></div><div class="banner info" style="border-color:rgba(224,88,79,.4)"><i class="fa-solid fa-triangle-exclamation" style="color:#e0584f"></i><div><strong>Couldn't load your files.</strong><br>${err.message}</div></div>`;
+    return;
+  }
+  paint();
+
+  function childrenOf(path){
+    const prefix = path ? path + '/' : '';
+    const folders = new Set();
+    const files = [];
+    tree.forEach(item => {
+      if (!item.path.startsWith(prefix)) return;
+      const rest = item.path.slice(prefix.length);
+      if (!rest) return;
+      const slash = rest.indexOf('/');
+      if (slash === -1) {
+        if (item.type === 'blob') files.push(item);
+      } else {
+        folders.add(rest.slice(0, slash));
+      }
+    });
+    return { folders: [...folders].sort(), files: files.sort((a,b)=>a.path.localeCompare(b.path)) };
+  }
+
+  function paint(){
+    const { folders, files } = childrenOf(mediaCurrentPath);
+    const crumbs = mediaCurrentPath.split('/');
+
+    content.innerHTML = sectionHead('Media Library', 'Everything your projects and hero can point to — upload new files here, then copy the path into a Source or Photo field elsewhere in the CMS.') + `
+      <div class="media-toolbar">
+        <div class="field">
+          <label class="field-label">Upload to folder</label>
+          <input id="uploadPath" value="${attr(mediaCurrentPath)}">
+        </div>
+        <button class="ghost" id="btnRefresh"><i class="fa-solid fa-rotate"></i> Refresh</button>
+      </div>
+
+      <div class="dropzone" id="dropzone">
+        <i class="fa-solid fa-cloud-arrow-up"></i>
+        Drag files here, or click to choose — images and videos both work
+        <input type="file" id="fileInput" multiple style="display:none">
+      </div>
+
+      <div class="media-folder-crumb" id="crumbs"></div>
+      <div class="media-grid" id="mediaGrid"></div>
+    `;
+
+    // breadcrumb
+    const crumbWrap = document.getElementById('crumbs');
+    crumbs.forEach((seg, i) => {
+      const pathHere = crumbs.slice(0, i+1).join('/');
+      const btn = document.createElement('button');
+      btn.textContent = seg;
+      btn.addEventListener('click', () => { mediaCurrentPath = pathHere; paint(); });
+      crumbWrap.appendChild(btn);
+      if (i < crumbs.length - 1) {
+        const sep = document.createElement('span');
+        sep.textContent = '/';
+        sep.style.color = '#444';
+        crumbWrap.appendChild(sep);
+      }
+    });
+
+    // grid
+    const grid = document.getElementById('mediaGrid');
+    if (!folders.length && !files.length) {
+      grid.innerHTML = `<div class="banner muted" style="grid-column:1/-1">Nothing in this folder yet — upload something above.</div>`;
+    }
+    folders.forEach(f => {
+      const tile = document.createElement('div');
+      tile.className = 'media-tile folder-tile';
+      tile.innerHTML = `<div class="thumb"><i class="fa-solid fa-folder"></i></div><div class="meta"><div class="fname">${esc(f)}</div></div>`;
+      tile.addEventListener('click', () => { mediaCurrentPath = mediaCurrentPath + '/' + f; paint(); });
+      grid.appendChild(tile);
+    });
+    files.forEach(item => {
+      const kind = fileKind(item.path);
+      const name = item.path.split('/').pop();
+      const tile = document.createElement('div');
+      tile.className = 'media-tile';
+      const thumbHtml = kind === 'image'
+        ? `<img src="${attr(item.path)}" loading="lazy" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-image&quot;&gt;&lt;/i&gt;'">`
+        : kind === 'video'
+        ? `<video src="${attr(item.path)}" muted preload="metadata"></video>`
+        : `<i class="fa-solid fa-file"></i>`;
+      tile.innerHTML = `
+        <div class="thumb">${thumbHtml}</div>
+        <div class="meta"><div class="fname">${esc(name)}</div></div>
+        <div class="tile-actions">
+          <button class="ghost" data-copy>Copy path</button>
+          <button class="danger" data-del>Delete</button>
+        </div>
+      `;
+      tile.querySelector('[data-copy]').addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(item.path); toast('Path copied — paste it into a Source or Photo field.'); }
+        catch(e){ prompt('Copy this path:', item.path); }
+      });
+      tile.querySelector('[data-del]').addEventListener('click', async () => {
+        if (!confirm(`Delete "${item.path}"? This can't be undone from here (though it stays in git history).`)) return;
+        try {
+          await GH.deleteFile(item.path, item.sha, `CMS: delete ${item.path}`);
+          toast(`Deleted ${name}.`);
+          tree = await loadMediaTree(true);
+          paint();
+        } catch(err){ toast(err.message, true); }
+      });
+      grid.appendChild(tile);
+    });
+
+    document.getElementById('btnRefresh').addEventListener('click', async () => {
+      tree = await loadMediaTree(true);
+      paint();
+      toast('Refreshed.');
+    });
+
+    // upload
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+    ['dragenter','dragover'].forEach(evt => dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('hover'); }));
+    ['dragleave','drop'].forEach(evt => dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('hover'); }));
+    dropzone.addEventListener('drop', e => { if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
+
+    async function handleFiles(fileList){
+      const folder = document.getElementById('uploadPath').value.trim().replace(/^\/+|\/+$/g,'') || 'assets';
+      for (const file of Array.from(fileList)) {
+        const path = folder + '/' + file.name;
+        dropzone.innerHTML = `<i class="fa-solid fa-circle-notch spin"></i> Uploading ${esc(file.name)}…`;
+        try {
+          const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          // Check for an existing file at this exact path first, so a
+          // same-name upload overwrites cleanly instead of erroring.
+          let existingSha = null;
+          const existing = tree.find(t => t.path === path);
+          if (existing) existingSha = existing.sha;
+
+          await GH.uploadBinary(path, dataUrl, `CMS: upload ${path}`, existingSha);
+          toast(`Uploaded ${file.name}.`);
+        } catch(err){
+          toast(`${file.name}: ${err.message}`, true);
+        }
+      }
+      tree = await loadMediaTree(true);
+      mediaCurrentPath = folder;
+      paint();
+    }
+  }
+};
+
+
+/* =====================================================================
+   13b. SETUP GUIDE
    ===================================================================== */
 function renderGuide(){
   document.querySelectorAll('.nav-item[data-section]').forEach(el=> el.classList.toggle('active', el.dataset.section==='guide'));
   content.innerHTML = `
-    <div class="content-head"><div><h2>Setup Guide</h2><p>How this tool is wired to your repo, and what's next.</p></div></div>
+    <div class="content-head"><div><h2>Setup Guide</h2><p>How this tool is wired to your repo.</p></div></div>
 
     <div class="panel">
       <h3>Where each screen writes to</h3>
@@ -1264,16 +1757,17 @@ function renderGuide(){
     </div>
 
     <div class="panel">
-      <h3>What's live already</h3>
-      <p class="panel-sub">The homepage hero reads <code class="k">data/hero.json</code> directly — edit it here, save, refresh the site. Done.</p>
+      <h3>All six are live</h3>
+      <p class="panel-sub">Every screen above is read directly by the site — <code class="k">index.html</code> and <code class="k">about/index.html</code>
+      fetch each JSON file on load and rebuild that part of the page from it. Editing here and saving is the whole workflow now;
+      nothing needs a follow-up code change.</p>
     </div>
 
     <div class="panel">
-      <h3>What's next</h3>
-      <p class="panel-sub">Projects, About, Reviews, Filters and Settings save to their JSON files right now, so nothing you do here is lost —
-      but the live pages for those five still render from the HTML until their own small "read from JSON" hook is added to
-      <code class="k">script.js</code>, the same pattern already used for the hero. That's a short, low-risk pass per file, matching the build order in the plan.
-      Keep editing here in the meantime — every save is already the source of truth waiting to be connected.</p>
+      <h3>Media Library</h3>
+      <p class="panel-sub">Upload and delete the actual image/video files your content points to, right from the CMS —
+      no more editing files through GitHub's web uploader. Copy a file's path from there straight into a Source, Photo,
+      or Thumbnail field on any other screen.</p>
     </div>
 
     <div class="panel">
@@ -1292,6 +1786,127 @@ function attr(s){ return esc(s).replace(/"/g,'&quot;'); }
 function val(id){ return document.getElementById(id).value; }
 function numVal(id){ return parseFloat(document.getElementById(id).value)||0; }
 function slugify(s){ return String(s).toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''); }
+function uid(){ return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+/* Ensures every item in a list has a stable client-side-only _uid,
+   used purely to track "this DOM card is the same item" across a
+   repaint so animateReorder() can animate it moving, and by the drag
+   handlers to know what's being dragged. Never saved — every save
+   function already whitelists its own fields, so _uid is naturally
+   dropped when writing back to GitHub. */
+function withUids(list){
+  return (list || []).map(it => (it._uid ? it : { ...it, _uid: uid() }));
+}
+
+/* FLIP-style reorder animation: records each [data-uid] child's
+   current position, lets renderFn() rebuild the list however it wants
+   (even a full innerHTML wipe-and-rebuild, or a whole-node replaceWith
+   — both are used elsewhere in this file), then plays a smooth
+   transform from the old position to the new one.
+
+   getContainer is a function, not a static element, and is called
+   twice — once before renderFn() and once after — because several of
+   this file's repaint patterns replace the container node itself
+   (content.innerHTML = ... rebuilds it fresh; replaceWith() swaps in
+   a new node). A container captured before the render would be a
+   detached, unchanged husk by the time this function tries to read
+   its "after" positions; re-fetching it is what makes this work
+   regardless of which repaint pattern the caller uses. */
+function animateReorder(getContainer, renderFn){
+  const before = getContainer();
+  const oldRects = {};
+  if (before) {
+    Array.from(before.children).forEach(el => {
+      if (el.dataset && el.dataset.uid) oldRects[el.dataset.uid] = el.getBoundingClientRect();
+    });
+  }
+  renderFn();
+  const after = getContainer();
+  if (!after) return;
+  Array.from(after.children).forEach(el => {
+    const uidKey = el.dataset && el.dataset.uid;
+    const old = uidKey && oldRects[uidKey];
+    if (!old) return;
+    const now = el.getBoundingClientRect();
+    const dx = old.left - now.left, dy = old.top - now.top;
+    if (dx || dy) {
+      el.style.transition = 'none';
+      el.style.transform = `translate(${dx}px, ${dy}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = 'transform 220ms cubic-bezier(.2,.8,.2,1)';
+        el.style.transform = '';
+      });
+    }
+  });
+}
+
+/* Makes every direct [data-uid] child of getContainer()'s current
+   result draggable by its .drag-handle, reordering itemsArr (an array
+   of objects each carrying a ._uid from withUids()) live as you drag,
+   then calling onChange() (typically flagUnsaved) and repainting
+   through animateReorder(). getContainer is a function rather than a
+   static element for the same reason animateReorder's is: some
+   repaint patterns replace the container node, so listeners are
+   attached to whatever's live at call time and the reorder logic
+   re-resolves it rather than trusting a reference that may already be
+   stale by the time a drag actually happens. Dragging only activates
+   from the handle itself — not the whole card — so text can still be
+   selected normally inside the card's inputs. */
+function enableDragReorder(getContainer, itemsArr, onChange, painter){
+  const container = getContainer();
+  if (!container) return;
+  let draggingUid = null;
+
+  container.addEventListener('mousedown', e => {
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    const card = handle.closest('[data-uid]');
+    if (card) card.setAttribute('draggable', 'true');
+  });
+  ['mouseup','dragend'].forEach(evt => container.addEventListener(evt, () => {
+    const live = getContainer();
+    if (live) live.querySelectorAll('[data-uid][draggable="true"]').forEach(c => c.removeAttribute('draggable'));
+  }));
+
+  container.addEventListener('dragstart', e => {
+    const card = e.target.closest('[data-uid]');
+    if (!card || card.getAttribute('draggable') !== 'true') return;
+    draggingUid = card.dataset.uid;
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', draggingUid); } catch(err){}
+  });
+
+  container.addEventListener('dragend', e => {
+    const card = e.target.closest('[data-uid]');
+    if (card) card.classList.remove('dragging');
+    draggingUid = null;
+  });
+
+  container.addEventListener('dragover', e => {
+    if (!draggingUid) return;
+    e.preventDefault();
+    const overCard = e.target.closest('[data-uid]');
+    if (!overCard || overCard.dataset.uid === draggingUid) return;
+
+    const fromIdx = itemsArr.findIndex(it => it._uid === draggingUid);
+    const toIdx = itemsArr.findIndex(it => it._uid === overCard.dataset.uid);
+    if (fromIdx === -1 || toIdx === -1) return;
+
+    const rect = overCard.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    let insertAt = toIdx + (before ? 0 : 1);
+    if (insertAt > fromIdx) insertAt--;
+    if (insertAt === fromIdx) return;
+
+    animateReorder(getContainer, () => {
+      const [moved] = itemsArr.splice(fromIdx, 1);
+      itemsArr.splice(insertAt, 0, moved);
+      onChange();
+      painter();
+    });
+  });
+}
 </script>
 </body>
 </html>

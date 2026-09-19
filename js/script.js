@@ -290,83 +290,192 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
   /* =========================================
-     0b. HOMEPAGE HERO — MESSAGES
+     0d. CMS OVERRIDE — ABOUT PAGE
      ========================================= */
-  /* ---------------------------------------------------------------
-     THIS IS THE ONLY PART YOU EDIT TO CHANGE THE HERO TEXT.
+  /* This one only ever does anything on about/index.html — it bails
+     immediately on every other page since #aboutHeadline doesn't
+     exist there. Nothing else in this file reads the about content,
+     so unlike projects/reviews there's no "must finish before X"
+     requirement here; it's awaited anyway just to keep every CMS
+     loader following the same shape. */
 
-     It doesn't have to be a quote any more. Each entry can be a
-     quote, a short message, a mission statement, a one-line story —
-     anything you want on the front page.
+  function buildTimelineBlock({ title, dateLine, bullets }) {
+    const item = document.createElement('div');
+    item.className = 'timeline-item clean-timeline';
 
-     Every field except `text` is optional. Leave one out (or set it
-     to '') and that line simply isn't rendered:
+    const h4 = document.createElement('h4');
+    h4.textContent = title || '';
+    item.appendChild(h4);
 
-       label  — the small tracked, uppercase line above the text.
-                Use it as a category: ON DESIGN / NOTE / CURRENTLY.
-       text   — the main statement. Add the “ ” yourself if you want
-                it to read as a quotation; leave them off for your
-                own writing.
-       author — plain text only, no links.
-       source — book / publication / where it's from, plain text.
-
-     TO ADD A NEW ONE: copy any block below, paste it inside the
-     array, change the words. That's it — no HTML, no CSS to touch.
-     They're picked at random on every page load (see below), so a
-     new entry is in rotation immediately.
-     --------------------------------------------------------------- */
-  const HERO_MESSAGES = [
-    {
-      label: 'On design',
-      text: '“Design is really an act of communication, which means having a deep understanding of the person with whom the designer is communicating.”',
-      author: 'Donald A. Norman',
-      source: 'The Design of Everyday Things'
-    },
-    {
-      label: 'On design',
-      text: '“Good design is actually a lot harder to notice than poor design, in part because good designs fit our needs so well that the design is invisible.”',
-      author: 'Donald A. Norman',
-      source: 'The Design of Everyday Things'
-    },
-    {
-      label: 'Currently',
-      text: 'Building visual systems that hold up — in 2D, in 3D, and in motion.',
-      author: 'LM.'
-    },
-    {
-      label: 'Approach',
-      text: 'Every frame is a decision. I try to make sure each one is deliberate.',
-      author: 'LM.'
-    },
-    {
-      // Text only — no label, no author, no source. This is a valid
-      // entry: the label line and the credit line (with its hairline
-      // rule) simply aren't drawn, and the statement sits alone.
-      // Leaving a field out entirely and setting it to '' do exactly
-      // the same thing, so use whichever reads better to you.
-      text: 'Open for freelance work.'
+    if (dateLine) {
+      const span = document.createElement('span');
+      span.className = 'timeline-date';
+      span.textContent = dateLine;
+      item.appendChild(span);
     }
+
+    const validBullets = (bullets || []).map(b => (b || '').trim()).filter(Boolean);
+    validBullets.forEach((b, i) => {
+      const p = document.createElement('p');
+      p.textContent = b;
+      item.appendChild(p);
+      if (i < validBullets.length - 1) item.appendChild(document.createElement('br'));
+    });
+
+    return item;
+  }
+
+  function fillSkillList(id, list) {
+    const ul = document.getElementById(id);
+    if (!ul || !Array.isArray(list) || !list.length) return;
+    ul.innerHTML = '';
+    list.forEach(s => {
+      const li = document.createElement('li');
+      li.textContent = s;
+      ul.appendChild(li);
+    });
+  }
+
+  async function loadAboutFromCMS() {
+    if (!window.ABOUT_URL) return;
+    const headlineEl = document.getElementById('aboutHeadline');
+    if (!headlineEl) return; // not the about page — nothing to do
+
+    try {
+      const res = await fetch(window.ABOUT_URL);
+      if (!res.ok) return;
+      const a = await res.json();
+      if (!a || typeof a !== 'object') return;
+
+      if (a.headline) headlineEl.textContent = a.headline;
+
+      const subheadEl = document.getElementById('aboutSubhead');
+      if (subheadEl && a.subhead) subheadEl.textContent = a.subhead;
+
+      const bioEl = document.getElementById('aboutBio');
+      if (bioEl && a.bio) bioEl.textContent = a.bio;
+
+      const photoEl = document.getElementById('aboutPhoto');
+      if (photoEl && a.photo) photoEl.src = a.photo;
+
+      fillSkillList('softwareSkillsList', a.softwareSkills);
+      fillSkillList('multimediaSkillsList', a.multimediaSkills);
+
+      const expList = document.getElementById('experienceList');
+      if (expList && Array.isArray(a.experience) && a.experience.length) {
+        expList.innerHTML = '';
+        a.experience.forEach(exp => {
+          expList.appendChild(buildTimelineBlock({ title: exp.role, dateLine: exp.company, bullets: exp.bullets }));
+        });
+      }
+
+      const eduList = document.getElementById('educationList');
+      if (eduList && Array.isArray(a.education) && a.education.length) {
+        eduList.innerHTML = '';
+        a.education.forEach(e => {
+          eduList.appendChild(buildTimelineBlock({ title: e.title, dateLine: e.detail, bullets: [] }));
+        });
+      }
+
+      const awList = document.getElementById('awardsList');
+      if (awList && Array.isArray(a.awards) && a.awards.length) {
+        awList.innerHTML = '';
+        a.awards.forEach(aw => {
+          awList.appendChild(buildTimelineBlock({ title: aw.title, dateLine: aw.detail, bullets: [] }));
+        });
+      }
+    } catch (err) {
+      console.warn('About: could not load', window.ABOUT_URL, err);
+      // Leave the existing static content in place.
+    }
+  }
+  await loadAboutFromCMS();
+
+
+  /* =========================================
+     0e. CMS OVERRIDE — FILTERS & BADGES
+     ========================================= */
+  /* Rebuilds the filter-tab buttons (homepage only) and the nav-bar
+     "Works" dropdown (every page that has one) from data/filters.json.
+     The ALL tab is never part of this data — it's structural, kept
+     exactly as already written in the HTML — matching the CMS plan's
+     own rule that ALL always exists automatically.
+
+     Same "must finish before it's read" requirement as projects and
+     reviews: filterBtns is captured once, in section 5 below, so this
+     needs to run first. */
+
+  async function loadFiltersFromCMS() {
+    if (!window.FILTERS_URL) return;
+
+    try {
+      const res = await fetch(window.FILTERS_URL);
+      if (!res.ok) return;
+      const list = await res.json();
+      if (!Array.isArray(list) || !list.length) return;
+
+      // Filter tabs — only exist on the homepage; harmless no-op elsewhere.
+      const tabs = document.querySelector('.filter-tabs');
+      if (tabs) {
+        const allBtn = tabs.querySelector('.tab-btn[data-filter="all"]');
+        tabs.innerHTML = '';
+        tabs.appendChild(allBtn || Object.assign(document.createElement('button'), {
+          className: 'tab-btn active', textContent: 'ALL'
+        }));
+        if (!allBtn) tabs.lastChild.setAttribute('data-filter', 'all');
+
+        list.forEach(f => {
+          if (!f || !f.id) return;
+          const btn = document.createElement('button');
+          btn.className = 'tab-btn';
+          btn.setAttribute('data-filter', f.id);
+          btn.textContent = f.label || f.id;
+          tabs.appendChild(btn);
+        });
+      }
+
+      // Nav-bar "Works" dropdown — appears on every page. Each page
+      // already links to itself with a different prefix (the
+      // homepage uses "/#id", the about page uses "../#id"), so the
+      // prefix is read off whatever link is already there rather than
+      // hardcoded, and reused for every rebuilt item.
+      document.querySelectorAll('.nav-dropdown-menu').forEach(menu => {
+        const firstLink = menu.querySelector('a');
+        const prefix = firstLink ? firstLink.getAttribute('href').split('#')[0] + '#' : '#';
+        menu.innerHTML = '';
+        list.forEach(f => {
+          if (!f || !f.id) return;
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = prefix + f.id;
+          a.textContent = f.label || f.id;
+          li.appendChild(a);
+          menu.appendChild(li);
+        });
+      });
+    } catch (err) {
+      console.warn('Filters: could not load', window.FILTERS_URL, err);
+      // Leave the existing static tabs/dropdown in place.
+    }
+  }
+  await loadFiltersFromCMS();
+
+
+  /* =========================================
+     0f. HOMEPAGE HERO — MESSAGES (fallback only)
+     ========================================= */
+  /* Hero messages now live in data/hero.json and are edited through
+     admin.html — see /README-CMS-SETUP.md. This single entry is a
+     fallback only, used if that fetch ever fails; it's not where you
+     add real messages anymore. */
+  const HERO_MESSAGES = [
+    { text: 'Open for freelance work.' }
   ];
 
-  /* ---------------------------------------------------------------
-     CMS HOOK — you won't need this until you build the CMS tool.
-
-     When that day comes, the CMS only has to drop a global array on
-     the page BEFORE script.js runs, in exactly the same shape as
-     HERO_MESSAGES above:
-
-       <script>
-         window.HERO_MESSAGES = [
-           { label: '...', text: '...', author: '...', source: '...' }
-         ];
-       </script>
-
-     …or, if the CMS writes a JSON file, set window.HERO_MESSAGES_URL
-     to it (e.g. 'data/hero-messages.json') and this will fetch it and
-     swap the text in once it arrives. Either way the array baked in
-     above stays as the offline/fallback copy, so the hero is never
-     empty if the CMS is down or you're previewing from file://.
-     --------------------------------------------------------------- */
+  /* Live source: data/hero.json, fetched via window.HERO_MESSAGES_URL
+     (set in index.html). getHeroMessages() below prefers that; the
+     fallback array above is only used if the fetch hasn't resolved
+     yet or fails outright. */
 
   /* HOW LONG A MESSAGE CAN BE.
 
