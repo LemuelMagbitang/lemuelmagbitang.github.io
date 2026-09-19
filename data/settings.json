@@ -4,7 +4,7 @@
     "project": true,
     "review": true
   },
-  "showCardBadges": true,
+  "showCardBadges": false,
   "showReviews": false,
   "web3forms": {
     "projectKey": "15822b98-f9a5-42fe-86f0-149ed102f521",
