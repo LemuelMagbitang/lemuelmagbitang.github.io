@@ -2,9 +2,50 @@
   "headline": "HELLO, I'M LM.",
   "subhead": "Visual Designer & Motion Specialist",
   "bio": "I'm Lemuel Magbitang, a multidisciplinary designer specializing in 2D/3D illustration, motion graphics, brand design, and UI/UX. My approach is to create engaging, high-quality visual experiences by combining technical precision with a clean, polished aesthetic.",
-  "photo": "assets/projects/site/profile.jpg",
-  "softwareSkills": ["Blender", "Krita", "Adobe After Effects", "Adobe Illustrator", "Adobe Photoshop", "Adobe Premiere Pro", "Figma"],
-  "multimediaSkills": ["Digital Illustration", "3D Modeling", "Graphic Design", "Traditional Illustration", "2D and 3D Animation", "Photography and Filmmaking"],
+  "photo": {
+    "src": "assets/projects/site/profile.jpg",
+    "zoom": 1,
+    "focus": "50% 50%",
+    "rotate": 0
+  },
+  "softwareSkills": [
+    {
+      "name": "Blender",
+      "icon": ""
+    },
+    {
+      "name": "Krita",
+      "icon": ""
+    },
+    {
+      "name": "Adobe After Effects",
+      "icon": ""
+    },
+    {
+      "name": "Adobe Illustrator",
+      "icon": ""
+    },
+    {
+      "name": "Adobe Photoshop",
+      "icon": ""
+    },
+    {
+      "name": "Adobe Premiere Pro",
+      "icon": ""
+    },
+    {
+      "name": "Figma",
+      "icon": ""
+    }
+  ],
+  "multimediaSkills": [
+    "Digital Illustration",
+    "3D Modeling",
+    "Graphic Design",
+    "Traditional Illustration",
+    "2D and 3D Animation",
+    "Photography and Filmmaking"
+  ],
   "experience": [
     {
       "role": "Design Co-Founder & Chief Creative Officer (CCO)",
@@ -47,11 +88,23 @@
     }
   ],
   "education": [
-    { "title": "Bachelor of Fine Arts Major in Visual Communication", "detail": "Graduated Bulacan State University mid-2025" }
+    {
+      "title": "Bachelor of Fine Arts Major in Visual Communication",
+      "detail": "Graduated Bulacan State University mid-2025"
+    }
   ],
   "awards": [
-    { "title": "5th Place - Digital Fine Arts", "detail": "57th Shell National Student Art Competition (NSAC)" },
-    { "title": "7th Place - Graphic Design", "detail": "University of the Philippines Los Baños (UPLB) Envision Workshop." },
-    { "title": "Certified Attendee", "detail": "Rokoko Webinar by VFX Artist Ian Hubert." }
+    {
+      "title": "5th Place - Digital Fine Arts",
+      "detail": "57th Shell National Student Art Competition (NSAC)"
+    },
+    {
+      "title": "7th Place - Graphic Design",
+      "detail": "University of the Philippines Los Baños (UPLB) Envision Workshop."
+    },
+    {
+      "title": "Certified Attendee",
+      "detail": "Rokoko Webinar by VFX Artist Ian Hubert."
+    }
   ]
 }
