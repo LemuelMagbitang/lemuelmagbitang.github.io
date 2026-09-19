@@ -468,6 +468,377 @@ document.addEventListener('DOMContentLoaded', async () => {
      exactly as already written in the HTML — matching the CMS plan's
      own rule that ALL always exists automatically.
 
+     Same "must finish before it's read" requireme    applyCardBadgesVisibility();
+    applyFormToggle(document.getElementById('projectForm'), document.getElementById('projectEmailBtn'), FORMS_ENABLED.project);
+    applyFormToggle(document.getElementById('reviewForm'), document.getElementById('reviewEmailBtn'), FORMS_ENABLED.review);
+    applyReviewsVisibility();
+
+    if (remote.web3forms) {
+      setHiddenField('projectForm', 'apikey', remote.web3forms.projectKey);
+      setHiddenField('reviewForm', 'apikey', remote.web3forms.reviewKey);
+    }
+    if (remote.redirectUrl) {
+      setHiddenField('projectForm', 'redirect', remote.redirectUrl);
+      setHiddenField('reviewForm', 'redirect', remote.redirectUrl);
+    }
+
+    if (remote.contactEmail) {
+      document.querySelectorAll('a[href^="mailto:"]').forEach(a => {
+        const query = a.getAttribute('href').split('?')[1];
+        a.href = 'mailto:' + remote.contactEmail + (query ? '?' + query : '');
+      });
+    }
+
+    if (remote.socials) {
+      setSocialHref('instagram', remote.socials.instagram);
+      setSocialHref('tiktok', remote.socials.tiktok);
+      setSocialHref('youtube', remote.socials.youtube);
+    }
+
+    if (remote.siteTitle) document.title = remote.siteTitle;
+  }
+
+  if (window.SETTINGS_URL) {
+    fetch(window.SETTINGS_URL)
+      .then(r => r.json())
+      .then(applySettings)
+      .catch(err => console.warn('Settings: could not load', window.SETTINGS_URL, err));
+  }
+
+
+  /* =========================================
+     0b. CMS OVERRIDE — PROJECTS
+     ========================================= */
+  /* If window.PROJECTS_URL points at data/projects.json, fetch it and,
+     when it returns a non-empty array, rebuild #portfolioGrid entirely
+     from that data. This has to happen — and finish — before anything
+     further down reads the grid: filtering, the hero banner's "5
+     latest artworks", and the lightbox click handlers each capture
+     the grid's cards once, early, into a fixed list. That's why this
+     is awaited before section 1 below, instead of firing in the
+     background the way hero text and settings do.
+
+     If the fetch fails, is empty, or window.PROJECTS_URL isn't set,
+     the static cards already written in this file are left exactly
+     as they are — that's the fallback, not an error state. */
+
+  function buildMediaItemEl(m) {
+    const el = document.createElement('div');
+    el.className = 'media-item';
+    if (m.type === 'video') el.setAttribute('data-video', m.src || '');
+    else if (m.type === 'youtube') el.setAttribute('data-youtube', m.src || '');
+    else el.setAttribute('data-image', m.src || '');
+    if (m.caption) el.setAttribute('data-description', m.caption);
+    if (m.orientation) el.setAttribute('data-orientation', m.orientation);
+    return el;
+  }
+
+  function buildProjectCardEl(p) {
+    const card = document.createElement('div');
+    const filters = Array.isArray(p.filters) ? p.filters.filter(Boolean) : [];
+    card.className = ['project-card', ...filters].join(' ');
+
+    if (p.badge) {
+      const badges = document.createElement('div');
+      badges.className = 'card-badges';
+      const span = document.createElement('span');
+      span.className = 'badge glass';
+      span.textContent = p.badge;
+      badges.appendChild(span);
+      card.appendChild(badges);
+    }
+
+    const thumb = document.createElement('div');
+    thumb.className = 'card-thumbnail';
+    const t = p.thumbnail || {};
+    if (t.src) {
+      // A real thumbnail image: focus/zoom go on the <img> itself,
+      // matching the convention already used in the static markup.
+      const img = document.createElement('img');
+      img.src = t.src;
+      img.alt = p.title || 'Project artwork';
+      if (t.focus) img.setAttribute('data-focus', t.focus);
+      if (t.zoom && Number(t.zoom) !== 1) img.setAttribute('data-zoom', t.zoom);
+      thumb.appendChild(img);
+    } else {
+      // No thumbnail set — leave it empty so fillMissingThumbnails()
+      // (section 1, right after this) fills it from the first media
+      // item, same as the static markup does. Focus/zoom go on the
+      // wrapper itself since there's no <img> yet to put them on.
+      if (t.focus) thumb.setAttribute('data-focus', t.focus);
+      if (t.zoom && Number(t.zoom) !== 1) thumb.setAttribute('data-zoom', t.zoom);
+    }
+    card.appendChild(thumb);
+
+    const info = document.createElement('div');
+    info.className = 'glass-info';
+    const h3 = document.createElement('h3');
+    h3.textContent = p.title || '';
+    const subtitleP = document.createElement('p');
+    subtitleP.textContent = p.subtitle || '';
+    info.appendChild(h3);
+    info.appendChild(subtitleP);
+    card.appendChild(info);
+
+    if (p.description) {
+      const descWrap = document.createElement('div');
+      descWrap.className = 'project-description';
+      descWrap.style.display = 'none';
+      const descP = document.createElement('p');
+      descP.textContent = p.description;
+      descWrap.appendChild(descP);
+      card.appendChild(descWrap);
+    }
+
+    const mediaList = document.createElement('div');
+    mediaList.className = 'project-media-list';
+    mediaList.style.display = 'none';
+    (Array.isArray(p.media) ? p.media : []).forEach(m => {
+      if (!m || !m.src) return;
+      mediaList.appendChild(buildMediaItemEl(m));
+    });
+    card.appendChild(mediaList);
+
+    return card;
+  }
+
+  async function loadProjectsFromCMS() {
+    if (!window.PROJECTS_URL) return;
+    const grid = document.getElementById('portfolioGrid');
+    if (!grid) return;
+
+    try {
+      const res = await fetch(window.PROJECTS_URL);
+      if (!res.ok) return;
+      const list = await res.json();
+      if (!Array.isArray(list) || !list.length) return;
+
+      const frag = document.createDocumentFragment();
+      list.forEach(p => frag.appendChild(buildProjectCardEl(p)));
+      grid.innerHTML = '';
+      grid.appendChild(frag);
+    } catch (err) {
+      console.warn('Projects: could not load', window.PROJECTS_URL, err);
+      // Leave the existing static cards in place.
+    }
+  }
+  await loadProjectsFromCMS();
+
+
+  /* =========================================
+     0c. CMS OVERRIDE — REVIEWS
+     ========================================= */
+  /* Same reasoning as projects: buildReviewsMarquee() (section 6,
+     further down) captures whatever's inside #reviewsTrack the first
+     time it runs and treats that as the permanent "pristine" set it
+     duplicates to build the scrolling loop. If the CMS cards weren't
+     in the DOM before that first run, they'd never make it into the
+     loop — so, same as projects, this is awaited up front rather than
+     fired in the background. */
+
+  function buildReviewCardEl(r) {
+    const card = document.createElement('div');
+    card.className = 'review-card';
+
+    const stars = document.createElement('div');
+    stars.className = 'review-stars';
+    const filled = Math.max(0, Math.min(5, Math.round(Number(r.stars) || 0)));
+    stars.textContent = '★'.repeat(filled) + '☆'.repeat(5 - filled);
+
+    const quote = document.createElement('p');
+    quote.className = 'review-quote';
+    quote.textContent = '"' + (r.quote || '') + '"';
+
+    const author = document.createElement('span');
+    author.className = 'review-author';
+    author.textContent = '— ' + (r.author || '');
+
+    card.appendChild(stars);
+    card.appendChild(quote);
+    card.appendChild(author);
+    return card;
+  }
+
+  async function loadReviewsFromCMS() {
+    if (!window.REVIEWS_URL) return;
+    const track = document.getElementById('reviewsTrack');
+    if (!track) return;
+
+    try {
+      const res = await fetch(window.REVIEWS_URL);
+      if (!res.ok) return;
+      const list = await res.json();
+      if (!Array.isArray(list) || !list.length) return;
+
+      const frag = document.createDocumentFragment();
+      list.forEach(r => frag.appendChild(buildReviewCardEl(r)));
+      track.innerHTML = '';
+      track.appendChild(frag);
+    } catch (err) {
+      console.warn('Reviews: could not load', window.REVIEWS_URL, err);
+      // Leave the existing static cards in place.
+    }
+  }
+  await loadReviewsFromCMS();
+
+
+  /* =========================================
+     0d. CMS OVERRIDE — ABOUT PAGE
+     ========================================= */
+  /* This one only ever does anything on about/index.html — it bails
+     immediately on every other page since #aboutHeadline doesn't
+     exist there. Nothing else in this file reads the about content,
+     so unlike projects/reviews there's no "must finish before X"
+     requirement here; it's awaited anyway just to keep every CMS
+     loader following the same shape. */
+
+  function buildTimelineBlock({ title, dateLine, bullets }) {
+    const item = document.createElement('div');
+    item.className = 'timeline-item clean-timeline';
+
+    const h4 = document.createElement('h4');
+    h4.textContent = title || '';
+    item.appendChild(h4);
+
+    if (dateLine) {
+      const span = document.createElement('span');
+      span.className = 'timeline-date';
+      span.textContent = dateLine;
+      item.appendChild(span);
+    }
+
+    const validBullets = (bullets || []).map(b => (b || '').trim()).filter(Boolean);
+    validBullets.forEach((b, i) => {
+      const p = document.createElement('p');
+      p.textContent = b;
+      item.appendChild(p);
+      if (i < validBullets.length - 1) item.appendChild(document.createElement('br'));
+    });
+
+    return item;
+  }
+
+  function fillSkillList(id, list) {
+    const ul = document.getElementById(id);
+    if (!ul || !Array.isArray(list) || !list.length) return;
+    ul.innerHTML = '';
+    // Multimedia skills are always plain strings. Software skills can
+    // now be either a plain string (older data, or a skill someone
+    // chose not to give a logo) or {name, icon} — a logo image instead
+    // of the name text. Handling both shapes here means this one
+    // function still covers both lists without needing to know which
+    // list it was called for.
+    const siteRoot = new URL('../', window.location.href);
+    list.forEach(s => {
+      const li = document.createElement('li');
+      const name = typeof s === 'string' ? s : (s && s.name) || '';
+      const icon = (s && typeof s === 'object') ? s.icon : '';
+      if (icon) {
+        li.classList.add('has-logo');
+        const img = document.createElement('img');
+        img.className = 'skill-logo';
+        img.alt = name; // read by screen readers even though the text itself isn't shown
+        img.title = name; // shows the name on hover, same info a text chip would give at a glance
+        img.loading = 'lazy';
+        img.src = new URL(icon, siteRoot).href;
+        li.appendChild(img);
+      } else {
+        li.textContent = name;
+      }
+      ul.appendChild(li);
+    });
+  }
+
+  async function loadAboutFromCMS() {
+    if (!window.ABOUT_URL) return;
+    const headlineEl = document.getElementById('aboutHeadline');
+    if (!headlineEl) return; // not the about page — nothing to do
+
+    try {
+      const res = await fetch(window.ABOUT_URL);
+      if (!res.ok) return;
+      const a = await res.json();
+      if (!a || typeof a !== 'object') return;
+
+      if (a.headline) headlineEl.textContent = a.headline;
+
+      const subheadEl = document.getElementById('aboutSubhead');
+      if (subheadEl && a.subhead) subheadEl.textContent = a.subhead;
+
+      const bioEl = document.getElementById('aboutBio');
+      if (bioEl && a.bio) bioEl.textContent = a.bio;
+
+      const photoEl = document.getElementById('aboutPhoto');
+      // a.photo can be a plain path string (the original shape) or an
+      // object with zoom/focus/rotate alongside it, the same
+      // src-plus-adjustments shape a project's thumbnail already uses.
+      // Normalizing here means this works with data saved before the
+      // photo editor supported those fields, and with data saved after.
+      const photo = typeof a.photo === 'string' ? { src: a.photo } : (a.photo || {});
+      if (photoEl && photo.src) {
+        // a.photo.src is stored root-relative in data/about.json (e.g.
+        // "assets/projects/site/profile.jpg"), the same way every path
+        // in every data/*.json file is. That resolves fine wherever the
+        // homepage reads it (the homepage *is* the site root), but this
+        // loader also runs on /about/ — one folder below root — where
+        // setting it directly would resolve to /about/assets/... and
+        // 404. Resolving it against the site root instead fixes that;
+        // an already-absolute URL (https://...) passes through new URL()
+        // completely unchanged, so pasting a full image URL still works.
+        const siteRoot = new URL('../', window.location.href);
+        photoEl.src = new URL(photo.src, siteRoot).href;
+        // Same three adjustments a project thumbnail supports (see
+        // applyThumbnailAdjustments below), applied directly here
+        // since the profile photo isn't a .project-card thumbnail for
+        // that function to find on its own.
+        if (photo.focus) photoEl.style.objectPosition = photo.focus;
+        if (photo.zoom) photoEl.style.setProperty('--thumb-zoom', photo.zoom);
+        if (photo.rotate) photoEl.style.setProperty('--thumb-rotate', photo.rotate + 'deg');
+      }
+
+      fillSkillList('softwareSkillsList', a.softwareSkills);
+      fillSkillList('multimediaSkillsList', a.multimediaSkills);
+
+      const expList = document.getElementById('experienceList');
+      if (expList && Array.isArray(a.experience) && a.experience.length) {
+        expList.innerHTML = '';
+        a.experience.forEach(exp => {
+          expList.appendChild(buildTimelineBlock({ title: exp.role, dateLine: exp.company, bullets: exp.bullets }));
+        });
+      }
+
+      const eduList = document.getElementById('educationList');
+      if (eduList && Array.isArray(a.education) && a.education.length) {
+        eduList.innerHTML = '';
+        a.education.forEach(e => {
+          eduList.appendChild(buildTimelineBlock({ title: e.title, dateLine: e.detail, bullets: [] }));
+        });
+      }
+
+      const awList = document.getElementById('awardsList');
+      if (awList && Array.isArray(a.awards) && a.awards.length) {
+        awList.innerHTML = '';
+        a.awards.forEach(aw => {
+          awList.appendChild(buildTimelineBlock({ title: aw.title, dateLine: aw.detail, bullets: [] }));
+        });
+      }
+    } catch (err) {
+      console.warn('About: could not load', window.ABOUT_URL, err);
+      // Leave the existing static content in place.
+    }
+  }
+  await loadAboutFromCMS();
+
+
+  /* =========================================
+     0e. CMS OVERRIDE — FILTERS & BADGES
+     ========================================= */
+  /* Rebuilds the filter-tab buttons (homepage only) and the nav-bar
+     "Works" dropdown (every page that has one) from data/filters.json.
+     The ALL tab is never part of this data — it's structural, kept
+     exactly as already written in the HTML — matching the CMS plan's
+     own rule that ALL always exists automatically.
+
      Same "must finish before it's read" requirement as projects and
      reviews: filterBtns is captured once, in section 5 below, so this
      needs to run first. */
