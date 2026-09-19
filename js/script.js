@@ -351,9 +351,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     const ul = document.getElementById(id);
     if (!ul || !Array.isArray(list) || !list.length) return;
     ul.innerHTML = '';
+    // Multimedia skills are always plain strings. Software skills can
+    // now be either a plain string (older data, or a skill someone
+    // chose not to give a logo) or {name, icon} — a logo image instead
+    // of the name text. Handling both shapes here means this one
+    // function still covers both lists without needing to know which
+    // list it was called for.
+    const siteRoot = new URL('../', window.location.href);
     list.forEach(s => {
       const li = document.createElement('li');
-      li.textContent = s;
+      const name = typeof s === 'string' ? s : (s && s.name) || '';
+      const icon = (s && typeof s === 'object') ? s.icon : '';
+      if (icon) {
+        li.classList.add('has-logo');
+        const img = document.createElement('img');
+        img.className = 'skill-logo';
+        img.alt = name; // read by screen readers even though the text itself isn't shown
+        img.title = name; // shows the name on hover, same info a text chip would give at a glance
+        img.loading = 'lazy';
+        img.src = new URL(icon, siteRoot).href;
+        li.appendChild(img);
+      } else {
+        li.textContent = name;
+      }
       ul.appendChild(li);
     });
   }
@@ -378,8 +398,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (bioEl && a.bio) bioEl.textContent = a.bio;
 
       const photoEl = document.getElementById('aboutPhoto');
-      if (photoEl && a.photo) {
-        // a.photo is stored root-relative in data/about.json (e.g.
+      // a.photo can be a plain path string (the original shape) or an
+      // object with zoom/focus/rotate alongside it, the same
+      // src-plus-adjustments shape a project's thumbnail already uses.
+      // Normalizing here means this works with data saved before the
+      // photo editor supported those fields, and with data saved after.
+      const photo = typeof a.photo === 'string' ? { src: a.photo } : (a.photo || {});
+      if (photoEl && photo.src) {
+        // a.photo.src is stored root-relative in data/about.json (e.g.
         // "assets/projects/site/profile.jpg"), the same way every path
         // in every data/*.json file is. That resolves fine wherever the
         // homepage reads it (the homepage *is* the site root), but this
@@ -389,7 +415,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // an already-absolute URL (https://...) passes through new URL()
         // completely unchanged, so pasting a full image URL still works.
         const siteRoot = new URL('../', window.location.href);
-        photoEl.src = new URL(a.photo, siteRoot).href;
+        photoEl.src = new URL(photo.src, siteRoot).href;
+        // Same three adjustments a project thumbnail supports (see
+        // applyThumbnailAdjustments below), applied directly here
+        // since the profile photo isn't a .project-card thumbnail for
+        // that function to find on its own.
+        if (photo.focus) photoEl.style.objectPosition = photo.focus;
+        if (photo.zoom) photoEl.style.setProperty('--thumb-zoom', photo.zoom);
+        if (photo.rotate) photoEl.style.setProperty('--thumb-rotate', photo.rotate + 'deg');
       }
 
       fillSkillList('softwareSkillsList', a.softwareSkills);
@@ -1671,6 +1704,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => { window.location.href = destination; }, 320);
       });
     });
+  }
+
+  /* THE "CONTACT LANDS IN THE MIDDLE OF THE PAGE" FIX.
+
+     Clicking Contact from the About page is a real navigation to
+     index.html#contact-section. The browser's own native behavior is
+     to scroll to that element as soon as it exists in the DOM while
+     parsing — which, on this page, is well before the hero banner's
+     artwork images and the project thumbnails have finished
+     downloading. Both of those load in fully async, after the page
+     has already parsed, and both push everything below them further
+     down the page as they arrive. The native scroll already happened
+     against the page's shorter, not-yet-settled height — so by the
+     time everything finishes loading, the section itself has moved
+     down past wherever the page was left, which reads as "landed
+     somewhere in the middle" rather than at the section.
+
+     window's 'load' event fires only once every last resource —
+     images included — has actually finished, so re-scrolling to the
+     hash at that point uses the page's true, final layout. If 'load'
+     already fired by the time this runs (rare, but possible on a
+     fast cached reload), readyState is already 'complete' and this
+     runs immediately instead of waiting for an event that already
+     happened. */
+  function correctAnchorScrollOnceLoaded() {
+    if (!window.location.hash) return;
+    let target;
+    try { target = document.querySelector(window.location.hash); } catch (err) { return; }
+    if (target) target.scrollIntoView({ block: 'start' });
+  }
+  if (document.readyState === 'complete') {
+    correctAnchorScrollOnceLoaded();
+  } else {
+    window.addEventListener('load', correctAnchorScrollOnceLoaded, { once: true });
   }
 
 });
