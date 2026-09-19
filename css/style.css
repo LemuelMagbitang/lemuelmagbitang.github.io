@@ -556,7 +556,17 @@ body {
    ABOUT ME SECTION
    ========================================= */
 .resume-section { display: flex; flex-direction: column; gap: 70px; max-width: 1000px; margin: 0 auto; }
-.profile-pic-large { width: 240px; height: 240px; border-radius: 50%; object-fit: cover; }
+.profile-pic-large {
+  width: 240px; height: 240px; border-radius: 50%; object-fit: cover;
+  /* Same zoom/rotate mechanism as a project's thumbnail (see
+     .card-thumbnail img above) — set from data/about.json's photo.zoom
+     / photo.rotate via script.js, defaulting to no change here. focus
+     comes through as a plain object-position, set the same way. */
+  --thumb-zoom: 1;
+  --thumb-rotate: 0deg;
+  transform: scale(var(--thumb-zoom)) rotate(var(--thumb-rotate));
+  transition: transform 0.4s ease, object-position 0.4s ease;
+}
 
 /* LAYOUT: skills row on top, everything else full width beneath it.
 
@@ -593,6 +603,13 @@ body {
 
 .skill-list.minimal-list { list-style: none; display: flex; flex-wrap: wrap; gap: 12px; }
 .skill-list.minimal-list li { background: rgba(255, 255, 255, 0.05); padding: 8px 18px; border-radius: 30px; font-size: 0.9rem; color: #ddd; letter-spacing: 0.5px; }
+/* A skill shown as a logo instead of its name keeps the same pill
+   shape and height as a text one — just tighter padding, since a
+   logo doesn't need the breathing room text does, and a fixed image
+   height so a wide logo and a tall one still sit at the same size
+   next to each other. */
+.skill-list.minimal-list li.has-logo { padding: 6px 16px; display: flex; align-items: center; }
+.skill-list.minimal-list li .skill-logo { height: 20px; width: auto; max-width: 100px; object-fit: contain; display: block; }
 
 .clean-timeline {
   margin-bottom: 30px;
@@ -936,6 +953,8 @@ body.center-page {
   .resume-main { gap: 40px; }
   
   .skill-list.minimal-list li { padding: 6px 14px; font-size: 0.8rem; }
+  .skill-list.minimal-list li.has-logo { padding: 5px 12px; }
+  .skill-list.minimal-list li .skill-logo { height: 17px; }
   
   .lightbox-nav { width: 36px; height: 36px; font-size: 0.8rem; }
   .lightbox-prev { left: 8px; }
@@ -1678,4 +1697,19 @@ body.center-page {
   .hero-overlay.quote-overlay {
     padding: 0;
   }
+}
+
+/* Footer copyright: .footer-content already centers each child as a
+   whole box (align-items: center), but that only centers the <p>'s
+   own box in the row — it says nothing about the text inside it. At
+   full width the line fits on one row so it never showed. On a
+   narrow phone it wraps to two lines, and text inside a block
+   defaults to left-aligned, so the second line ("Reserved.") was
+   hanging under the left edge of the first instead of sitting under
+   its center. text-align: center fixes that at any width, and the
+   smaller mobile size makes wrapping to two lines less likely in the
+   first place. */
+.footer-content p { text-align: center; }
+@media (max-width: 768px) {
+  .footer-content p { font-size: 0.85rem; padding: 0 10px; }
 }
