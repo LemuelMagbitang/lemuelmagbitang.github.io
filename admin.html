@@ -227,13 +227,18 @@
   .dropzone{border:1.5px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--text-dim);font-size:13px;margin-bottom:22px;transition:border-color .15s, background .15s;cursor:pointer;}
   .dropzone.hover{border-color:#fff;background:rgba(255,255,255,.04);color:#fff;}
   .dropzone i{font-size:22px;display:block;margin-bottom:8px;color:#666;}
-  .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
-  .media-tile{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:9px;overflow:hidden;}
-  .media-tile .thumb{width:100%;aspect-ratio:1/1;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
+  .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;align-content:start;}
+  /* display:flex + flex-direction:column here (rather than relying on
+     plain block flow) guarantees .thumb and .meta always stack as two
+     distinct, fully-sized boxes — the folder name has never actually
+     failed to render in testing, but this removes any doubt about it
+     being squeezed to nothing by a stray height rule elsewhere. */
+  .media-tile{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:9px;overflow:hidden;display:flex;flex-direction:column;}
+  .media-tile .thumb{width:100%;aspect-ratio:1/1;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;flex-shrink:0;}
   .media-tile .thumb img,.media-tile .thumb video{width:100%;height:100%;object-fit:cover;}
   .media-tile .thumb i{font-size:26px;color:#555;}
-  .media-tile .meta{padding:9px 10px;}
-  .media-tile .fname{font-size:11.5px;color:#ddd;word-break:break-all;line-height:1.4;max-height:2.8em;overflow:hidden;}
+  .media-tile .meta{padding:9px 10px;min-height:1px;}
+  .media-tile .fname{font-size:11.5px;color:#ddd!important;word-break:break-all;line-height:1.4;max-height:2.8em;overflow:hidden;display:block;}
   .media-tile .tile-actions{display:flex;gap:6px;padding:0 10px 10px;}
   .media-tile .tile-actions button{flex:1;padding:6px 4px;font-size:11px;}
   /* A file appears in the grid the instant it's dropped/chosen — using a
@@ -1282,6 +1287,12 @@ RENDERERS.projects = async function(data){
   }
 
   function buildProjectBody(el, p){
+    // Which artwork cards are expanded, by _uid. Starts empty (every
+    // artwork loads collapsed to just its title bar) so opening a
+    // project with a dozen images doesn't dump a dozen full editors
+    // on screen at once — newly-added artworks are the one exception,
+    // added straight into this set so they open ready to fill in.
+    const openMediaUids = new Set();
     el.innerHTML = `
       <div class="row">
         <div class="field"><label class="field-label">Title</label><input data-f="title" value="${attr(p.title)}"></div>
@@ -1423,43 +1434,52 @@ RENDERERS.projects = async function(data){
       const freshWrap = document.createElement('div');
       freshWrap.setAttribute('data-medialist', '');
       p.media.forEach((m)=>{
+        const isOpen = openMediaUids.has(m._uid);
         const row = document.createElement('div');
         row.className = 'card-item';
         row.style.background = '#191919';
         row.dataset.uid = m._uid;
         row.innerHTML = `
-          <div class="card-item-head">
+          <div class="card-item-head collapsible-head" data-toggle-open>
             <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
             <span class="item-title">${m.caption ? esc(m.caption) : '(' + m.type + ')'}</span>
             <div class="card-item-actions">
-              <button class="icon-btn" data-mact="up"><i class="fa-solid fa-arrow-up"></i></button>
-              <button class="icon-btn" data-mact="down"><i class="fa-solid fa-arrow-down"></i></button>
-              <button class="icon-btn" data-mact="del" style="color:#e0584f"><i class="fa-solid fa-trash"></i></button>
+              <button class="icon-btn" data-mact="up" title="Move up"><i class="fa-solid fa-arrow-up"></i></button>
+              <button class="icon-btn" data-mact="down" title="Move down"><i class="fa-solid fa-arrow-down"></i></button>
+              <button class="icon-btn" data-mact="del" title="Delete" style="color:#e0584f"><i class="fa-solid fa-trash"></i></button>
+              <button class="icon-btn" data-mact="toggle"><i class="fa-solid fa-chevron-${isOpen?'up':'down'}"></i></button>
             </div>
           </div>
-          <div class="row">
-            <div class="field" style="max-width:140px"><label class="field-label">Type</label>
-              <select data-mf="type">
-                <option value="image" ${m.type==='image'?'selected':''}>Image</option>
-                <option value="video" ${m.type==='video'?'selected':''}>Video</option>
-                <option value="youtube" ${m.type==='youtube'?'selected':''}>YouTube</option>
-              </select>
+          <div class="collapsible-body" style="display:${isOpen?'block':'none'};margin-top:16px;" data-mbody>
+            <div class="row">
+              <div class="field" style="max-width:140px"><label class="field-label">Type</label>
+                <select data-mf="type">
+                  <option value="image" ${m.type==='image'?'selected':''}>Image</option>
+                  <option value="video" ${m.type==='video'?'selected':''}>Video</option>
+                  <option value="youtube" ${m.type==='youtube'?'selected':''}>YouTube</option>
+                </select>
+              </div>
+              <div class="field"><label class="field-label">Source (file path or URL)</label><input data-mf="src" value="${attr(m.src)}" placeholder="assets/projects/your-folder/artwork.jpg"></div>
             </div>
-            <div class="field"><label class="field-label">Source (file path or URL)</label><input data-mf="src" value="${attr(m.src)}" placeholder="assets/projects/your-folder/artwork.jpg"></div>
-          </div>
-          <div class="row">
-            <div class="field"><label class="field-label">Caption <span style="opacity:.5">(optional)</span></label><input data-mf="caption" value="${attr(m.caption)}"></div>
-            <div class="field" style="max-width:180px"><label class="field-label">Orientation</label>
-              <select data-mf="orientation">
-                <option value="" ${!m.orientation?'selected':''}>Auto</option>
-                <option value="landscape" ${m.orientation==='landscape'?'selected':''}>Landscape</option>
-                <option value="portrait" ${m.orientation==='portrait'?'selected':''}>Portrait</option>
-                <option value="square" ${m.orientation==='square'?'selected':''}>Square</option>
-              </select>
+            <div class="row">
+              <div class="field"><label class="field-label">Caption <span style="opacity:.5">(optional)</span></label><input data-mf="caption" value="${attr(m.caption)}"></div>
+              <div class="field" style="max-width:180px"><label class="field-label">Orientation</label>
+                <select data-mf="orientation">
+                  <option value="" ${!m.orientation?'selected':''}>Auto</option>
+                  <option value="landscape" ${m.orientation==='landscape'?'selected':''}>Landscape</option>
+                  <option value="portrait" ${m.orientation==='portrait'?'selected':''}>Portrait</option>
+                  <option value="square" ${m.orientation==='square'?'selected':''}>Square</option>
+                </select>
+              </div>
             </div>
+            <div data-mediapreview></div>
           </div>
-          <div data-mediapreview></div>
         `;
+        row.querySelector('[data-toggle-open]').addEventListener('click', (e)=>{
+          if (e.target.closest('[data-mact]') && e.target.closest('[data-mact]').dataset.mact !== 'toggle') return;
+          if (isOpen) openMediaUids.delete(m._uid); else openMediaUids.add(m._uid);
+          paintMedia();
+        });
         const previewEl = row.querySelector('[data-mediapreview]');
         function refreshPreview(){
           previewEl.innerHTML = buildMediaPreviewHtml(m);
@@ -1504,7 +1524,12 @@ RENDERERS.projects = async function(data){
       refreshThumbPreview();
     }
     paintMedia();
-    el.querySelector('[data-addmedia]').addEventListener('click', ()=>{ p.media.push({type:'image',src:'',caption:'',orientation:'',_uid:uid()}); flagUnsaved(); paintMedia(); });
+    el.querySelector('[data-addmedia]').addEventListener('click', ()=>{
+      const fresh = {type:'image',src:'',caption:'',orientation:'',_uid:uid()};
+      p.media.push(fresh);
+      openMediaUids.add(fresh._uid); // new artwork opens straight into edit mode
+      flagUnsaved(); paintMedia();
+    });
   }
 
   function badgeOptions(current){
@@ -1525,9 +1550,13 @@ RENDERERS.about = function(data){
   let a = data.json || {};
   a.softwareSkills = a.softwareSkills || [];
   a.multimediaSkills = a.multimediaSkills || [];
-  a.experience = a.experience || [];
-  a.education = a.education || [];
-  a.awards = a.awards || [];
+  // withUids() gives each entry a stable ._uid, which is how
+  // enableDragReorder tracks a card through a drag — the same
+  // mechanism Hero Messages, Filters & Badges, and Projects already
+  // use, so dragging one of these feels identical to dragging those.
+  a.experience = withUids(a.experience || []);
+  a.education = withUids(a.education || []);
+  a.awards = withUids(a.awards || []);
 
   function paint(){
     content.innerHTML = sectionHead('About Page','The whole About page as one record — nothing here needs the HTML touched again.') + `
@@ -1634,66 +1663,102 @@ RENDERERS.about = function(data){
   }
 
   function buildSimpleRepeater(listId, arr, addBtnId, fields){
-    const list = document.getElementById(listId);
     function repaint(){
+      const list = document.getElementById(listId);
       list.innerHTML = '';
       arr.forEach((item,i)=>{
         const row = document.createElement('div');
         row.className = 'card-item';
+        row.dataset.uid = item._uid;
         row.innerHTML = `
           <div class="card-item-head">
-            <span class="item-title">Entry ${i+1}</span>
+            <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+            <span class="item-title">${esc(item[fields[0].f] || ('Entry ' + (i+1)))}</span>
             <div class="card-item-actions">
-              <button class="icon-btn" data-act="up"><i class="fa-solid fa-arrow-up"></i></button>
-              <button class="icon-btn" data-act="down"><i class="fa-solid fa-arrow-down"></i></button>
-              <button class="icon-btn" data-act="del" style="color:#e0584f"><i class="fa-solid fa-trash"></i></button>
+              <button class="icon-btn" data-act="up" title="Move up"><i class="fa-solid fa-arrow-up"></i></button>
+              <button class="icon-btn" data-act="down" title="Move down"><i class="fa-solid fa-arrow-down"></i></button>
+              <button class="icon-btn" data-act="del" title="Delete" style="color:#e0584f"><i class="fa-solid fa-trash"></i></button>
             </div>
           </div>
           <div class="row">
             ${fields.map(f=>`<div class="field"><input data-f="${f.f}" value="${attr(item[f.f]||'')}" placeholder="${f.ph}"></div>`).join('')}
           </div>
         `;
-        row.querySelectorAll('[data-f]').forEach(inp=> inp.addEventListener('input', ()=>{ item[inp.dataset.f]=inp.value; flagUnsaved(); }));
+        row.querySelectorAll('[data-f]').forEach(inp=> inp.addEventListener('input', ()=>{
+          item[inp.dataset.f]=inp.value;
+          if (inp.dataset.f === fields[0].f) row.querySelector('.item-title').textContent = item[fields[0].f] || ('Entry ' + (i+1));
+          flagUnsaved();
+        }));
         row.querySelector('[data-act="del"]').addEventListener('click', ()=>{ arr.splice(i,1); flagUnsaved(); repaint(); });
-        row.querySelector('[data-act="up"]').addEventListener('click', ()=>{ if(i===0)return; [arr[i-1],arr[i]]=[arr[i],arr[i-1]]; flagUnsaved(); repaint(); });
-        row.querySelector('[data-act="down"]').addEventListener('click', ()=>{ if(i===arr.length-1)return; [arr[i+1],arr[i]]=[arr[i],arr[i+1]]; flagUnsaved(); repaint(); });
+        row.querySelector('[data-act="up"]').addEventListener('click', ()=>{ if(i===0)return; animateReorder(() => document.getElementById(listId), () => { [arr[i-1],arr[i]]=[arr[i],arr[i-1]]; flagUnsaved(); repaint(); }); });
+        row.querySelector('[data-act="down"]').addEventListener('click', ()=>{ if(i===arr.length-1)return; animateReorder(() => document.getElementById(listId), () => { [arr[i+1],arr[i]]=[arr[i],arr[i+1]]; flagUnsaved(); repaint(); }); });
         list.appendChild(row);
       });
     }
     document.getElementById(addBtnId).addEventListener('click', ()=>{
-      const blank = {}; fields.forEach(f=>blank[f.f]=''); arr.push(blank); flagUnsaved(); repaint();
+      const blank = { _uid: uid() }; fields.forEach(f=>blank[f.f]=''); arr.push(blank); flagUnsaved(); repaint();
     });
     repaint();
+    // Attached once, not inside repaint(): unlike the full-screen
+    // sections (Hero Messages, Projects, etc.) this repaint() only
+    // ever clears and refills #listId's children — the container
+    // itself never gets recreated — so one set of listeners on that
+    // stable container is all this ever needs. Re-running this inside
+    // repaint() would stack a fresh set of listeners on the same node
+    // every single edit.
+    enableDragReorder(() => document.getElementById(listId), arr, flagUnsaved, repaint);
   }
 
   function buildExperience(){
     const list = document.getElementById('expList');
+    // Collapsed by default, same reasoning as the project artwork
+    // list — a full work history is the longest thing on this page,
+    // and only one entry is usually being edited at a time. A brand
+    // new entry (see addExp below) is added straight into this set so
+    // it opens ready to fill in instead of collapsing on itself.
+    const openUids = new Set();
+
     function repaint(){
       list.innerHTML = '';
       a.experience.forEach((exp,i)=>{
         exp.bullets = exp.bullets || [];
+        const isOpen = openUids.has(exp._uid);
         const row = document.createElement('div');
         row.className = 'card-item';
+        row.dataset.uid = exp._uid;
         row.innerHTML = `
-          <div class="card-item-head">
-            <span class="item-title">${esc(exp.role||'New role')} ${exp.company?'— '+esc(exp.company):''}</span>
+          <div class="card-item-head collapsible-head" data-toggle-open>
+            <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+            <span class="preview-line">${esc(exp.role||'New role')}${exp.company?' — '+esc(exp.company):''}</span>
             <div class="card-item-actions">
-              <button class="icon-btn" data-act="up"><i class="fa-solid fa-arrow-up"></i></button>
-              <button class="icon-btn" data-act="down"><i class="fa-solid fa-arrow-down"></i></button>
-              <button class="icon-btn" data-act="del" style="color:#e0584f"><i class="fa-solid fa-trash"></i></button>
+              <button class="icon-btn" data-act="up" title="Move up"><i class="fa-solid fa-arrow-up"></i></button>
+              <button class="icon-btn" data-act="down" title="Move down"><i class="fa-solid fa-arrow-down"></i></button>
+              <button class="icon-btn" data-act="del" title="Delete" style="color:#e0584f"><i class="fa-solid fa-trash"></i></button>
+              <button class="icon-btn" data-act="toggle"><i class="fa-solid fa-chevron-${isOpen?'up':'down'}"></i></button>
             </div>
           </div>
-          <div class="row">
-            <div class="field"><label class="field-label">Role</label><input data-f="role" value="${attr(exp.role)}"></div>
-            <div class="field"><label class="field-label">Company</label><input data-f="company" value="${attr(exp.company)}"></div>
+          <div class="collapsible-body" style="display:${isOpen?'block':'none'};margin-top:16px;" data-body>
+            <div class="row">
+              <div class="field"><label class="field-label">Role</label><input data-f="role" value="${attr(exp.role)}"></div>
+              <div class="field"><label class="field-label">Company</label><input data-f="company" value="${attr(exp.company)}"></div>
+            </div>
+            <div class="subrepeater" data-bullets></div>
+            <button class="add-btn" data-addbullet type="button" style="margin-top:10px"><i class="fa-solid fa-plus"></i> Add bullet</button>
           </div>
-          <div class="subrepeater" data-bullets></div>
-          <button class="add-btn" data-addbullet type="button" style="margin-top:10px"><i class="fa-solid fa-plus"></i> Add bullet</button>
         `;
-        row.querySelectorAll('[data-f]').forEach(inp=> inp.addEventListener('input', ()=>{ exp[inp.dataset.f]=inp.value; flagUnsaved(); }));
-        row.querySelector('[data-act="del"]').addEventListener('click', ()=>{ a.experience.splice(i,1); flagUnsaved(); repaint(); });
-        row.querySelector('[data-act="up"]').addEventListener('click', ()=>{ if(i===0)return; [a.experience[i-1],a.experience[i]]=[a.experience[i],a.experience[i-1]]; flagUnsaved(); repaint(); });
-        row.querySelector('[data-act="down"]').addEventListener('click', ()=>{ if(i===a.experience.length-1)return; [a.experience[i+1],a.experience[i]]=[a.experience[i],a.experience[i+1]]; flagUnsaved(); repaint(); });
+        row.querySelector('[data-toggle-open]').addEventListener('click', (e)=>{
+          if (e.target.closest('[data-act]') && e.target.closest('[data-act]').dataset.act !== 'toggle') return;
+          if (isOpen) openUids.delete(exp._uid); else openUids.add(exp._uid);
+          repaint();
+        });
+        row.querySelectorAll('[data-f]').forEach(inp=> inp.addEventListener('input', ()=>{
+          exp[inp.dataset.f]=inp.value;
+          row.querySelector('.preview-line').textContent = (exp.role||'New role') + (exp.company?' — '+exp.company:'');
+          flagUnsaved();
+        }));
+        row.querySelector('[data-act="del"]').addEventListener('click', (e)=>{ e.stopPropagation(); a.experience.splice(i,1); flagUnsaved(); repaint(); });
+        row.querySelector('[data-act="up"]').addEventListener('click', (e)=>{ e.stopPropagation(); if(i===0)return; animateReorder(() => document.getElementById('expList'), () => { [a.experience[i-1],a.experience[i]]=[a.experience[i],a.experience[i-1]]; flagUnsaved(); repaint(); }); });
+        row.querySelector('[data-act="down"]').addEventListener('click', (e)=>{ e.stopPropagation(); if(i===a.experience.length-1)return; animateReorder(() => document.getElementById('expList'), () => { [a.experience[i+1],a.experience[i]]=[a.experience[i],a.experience[i+1]]; flagUnsaved(); repaint(); }); });
 
         const bWrap = row.querySelector('[data-bullets]');
         function repaintBullets(){
@@ -1712,8 +1777,17 @@ RENDERERS.about = function(data){
         list.appendChild(row);
       });
     }
-    document.getElementById('addExp').addEventListener('click', ()=>{ a.experience.push({role:'',company:'',bullets:['']}); flagUnsaved(); repaint(); });
+    document.getElementById('addExp').addEventListener('click', ()=>{
+      const fresh = {role:'',company:'',bullets:[''],_uid:uid()};
+      a.experience.push(fresh);
+      openUids.add(fresh._uid);
+      flagUnsaved(); repaint();
+    });
     repaint();
+    // Same reasoning as buildSimpleRepeater above: #expList's own node
+    // is never recreated by repaint(), only its children are, so this
+    // is attached once rather than inside repaint().
+    enableDragReorder(() => document.getElementById('expList'), a.experience, flagUnsaved, repaint);
   }
 
   paint();
@@ -1768,7 +1842,7 @@ function openMediaPicker(onPick){
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px;';
   overlay.innerHTML = `
-    <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:640px;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%;max-width:640px;height:min(82vh,640px);max-height:82vh;display:flex;flex-direction:column;overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);flex-shrink:0;">
         <strong style="color:#fff;font-size:.95rem">Choose a file</strong>
         <button class="icon-btn" data-close-picker type="button"><i class="fa-solid fa-xmark"></i></button>
@@ -1776,7 +1850,16 @@ function openMediaPicker(onPick){
       <div style="padding:14px 20px 0;flex-shrink:0;">
         <div class="media-folder-crumb" id="pickerCrumbs"></div>
       </div>
-      <div class="media-grid" id="pickerGrid" style="padding:4px 20px 20px;overflow-y:auto;flex:1 1 auto;min-height:0;"></div>
+      <!-- height:min(82vh,640px) above turns this into a fixed-size
+           window instead of one that only happens to be tall enough
+           for however many folders/files are in view right now — so
+           a folder with 60 files scrolls internally here exactly the
+           same way a folder with 3 files does, rather than the whole
+           modal trying (and on some phones, failing) to grow past the
+           viewport. overscroll-behavior:contain keeps a fast scroll to
+           the end of a long folder from bleeding into the page behind
+           the modal, the same fix already used on the lightbox. -->
+      <div class="media-grid" id="pickerGrid" style="padding:4px 20px 20px;overflow-y:auto;overscroll-behavior:contain;flex:1 1 auto;min-height:0;"></div>
     </div>
   `;
   document.body.appendChild(overlay);

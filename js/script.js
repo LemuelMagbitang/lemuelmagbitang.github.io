@@ -1010,8 +1010,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         const projectsUrl = new URL('../data/projects.json', window.location.href).href;
         const response = await fetch(projectsUrl);
         const list = await response.json();
+
+        // THE BUG THIS FIXES: every asset path in projects.json, like
+        // "assets/projects/haeru/haeru-logo-design.jpg", is meant to be
+        // resolved against the SITE ROOT — same convention as every
+        // other path in this file (see the big comment above
+        // collectHeroSources). This used to pass response.url (the
+        // fetched JSON file's own URL, something like
+        // ".../data/projects.json") as that resolution base instead.
+        // Resolving a relative path against a URL that ends in a
+        // filename replaces just that filename, not the whole
+        // directory — so "assets/projects/x.jpg" resolved against
+        // ".../data/projects.json" became ".../data/assets/projects/x.jpg",
+        // a URL that was never going to exist. That's exactly the
+        // 404s (and the blank hero banner they caused, since every
+        // slide was a broken image) in the About page console.
+        //
+        // siteRootUrl strips everything after the domain, giving the
+        // one base every one of these paths was actually written
+        // against.
+        const siteRootUrl = new URL('/', window.location.href).href;
+
         heroSources = (Array.isArray(list) ? list : [])
-          .map(p => heroSourceFromProjectData(p, response.url || projectsUrl))
+          .map(p => heroSourceFromProjectData(p, siteRootUrl))
           .filter(Boolean);
       } catch (err) {
         console.warn('Hero banner: could not load artwork from data/projects.json.', err);
