@@ -29,6 +29,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   // enough reviews yet, or just want it off the page for a while.
   let SHOW_REVIEWS = false;
 
+  /* Looked up here, right at the top, instead of down in section 6
+     where the reviews marquee is actually built.
+
+     BUG THIS FIXES: applySettings() (right below) can call
+     applyReviewsVisibility(), which reads reviewsSection, the moment
+     data/settings.json finishes loading. That fetch resolves whenever
+     the network returns it — which can easily happen before the
+     script has finished running section 6, further down this same
+     file, is where reviewsSection used to be declared with `const`.
+
+     A `const` doesn't exist at all until its own line actually runs
+     (this is "the temporal dead zone") — so if the settings fetch won
+     the race, applyReviewsVisibility would reach for a variable that
+     technically wasn't there yet and throw
+     "Cannot access 'reviewsSection' before initialization", which is
+     exactly the error this was throwing in the console. Declaring
+     these three here, before anything async gets a chance to run,
+     means they're always ready no matter which fetch finishes first. */
+  const reviewsMarquee = document.querySelector('.reviews-marquee');
+  const reviewsTrack = document.getElementById('reviewsTrack');
+  const reviewsSection = document.querySelector('.reviews-section');
+
 
   /* =========================================
      0a. CMS OVERRIDE — SETTINGS
@@ -1227,9 +1249,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // leaving blank space — then loops infinitely. You only ever need to
   // write each review once in the HTML; this handles the rest, and
   // re-measures whenever the window is resized.
-  const reviewsMarquee = document.querySelector('.reviews-marquee');
-  const reviewsTrack = document.getElementById('reviewsTrack');
-  const reviewsSection = document.querySelector('.reviews-section');
+  // reviewsMarquee / reviewsTrack / reviewsSection now declared at the
+  // very top of the file (section 0) — see the comment there for why.
   let pristineTopCards = null;
   let pristineBottomCards = null;
 

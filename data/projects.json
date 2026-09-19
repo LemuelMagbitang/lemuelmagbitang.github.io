@@ -411,31 +411,31 @@
     "media": [
       {
         "type": "image",
-        "src": "assets\\projects\\aol\\figureground.jpg",
+        "src": "assets/projects/aol/figureground.jpg",
         "caption": "",
         "orientation": ""
       },
       {
         "type": "image",
-        "src": "assets\\projects\\aol\\continuity.jpg",
+        "src": "assets/projects/aol/continuity.jpg",
         "caption": "",
         "orientation": ""
       },
       {
         "type": "image",
-        "src": "assets\\projects\\aol\\combination.jpg",
+        "src": "assets/projects/aol/combination.jpg",
         "caption": "",
         "orientation": ""
       },
       {
         "type": "image",
-        "src": "assets\\projects\\aol\\proximity.jpg",
+        "src": "assets/projects/aol/proximity.jpg",
         "caption": "",
         "orientation": ""
       },
       {
         "type": "image",
-        "src": "assets\\projects\\aol\\similarity.jpg",
+        "src": "assets/projects/aol/similarity.jpg",
         "caption": "",
         "orientation": ""
       }
