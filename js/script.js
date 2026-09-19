@@ -935,6 +935,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     }).filter(Boolean);
   }
 
+  // The data/projects.json equivalent of collectHeroSources's per-card
+  // mapping above — same order of preference (explicit thumbnail, then
+  // first image media item, then first YouTube item's thumbnail), just
+  // reading JSON fields instead of DOM attributes since there's no
+  // rendered markup to read them from here.
+  function heroSourceFromProjectData(p, baseUrl) {
+    if (!p) return null;
+    const thumb = p.thumbnail || {};
+    let rawSrc = thumb.src || null;
+
+    if (!rawSrc && Array.isArray(p.media)) {
+      const firstImage = p.media.find(m => m && m.type === 'image' && m.src);
+      if (firstImage) {
+        rawSrc = firstImage.src;
+      } else {
+        const firstYouTube = p.media.find(m => m && m.type === 'youtube' && m.src);
+        if (firstYouTube) {
+          const { id } = parseYouTubeUrl(firstYouTube.src);
+          if (id) rawSrc = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+        }
+      }
+    }
+
+    if (!rawSrc) return null;
+
+    let src = rawSrc;
+    if (baseUrl) {
+      try { src = new URL(rawSrc, baseUrl).href; } catch (e) { /* keep raw */ }
+    }
+
+    return { src, alt: p.title || 'Featured artwork', focus: thumb.focus || null };
+  }
+
   async function initHeroBanner() {
     const heroContainer = document.getElementById('heroBanner') || document.getElementById('heroBannerAbout');
     if (!heroContainer) return; // this page has no hero banner at all
@@ -942,18 +975,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     let heroSources = collectHeroSources(document, null);
 
     if (heroSources.length === 0) {
-      // No grid on this page (i.e. we're on About) — pull the Works page
-      // in and read the same 5 cards from it. Resolved from this page's
-      // own location so it keeps working wherever the site is served
-      // from, root domain or a /Portfolio/ subpath.
+      // No grid on this page (i.e. we're on About) — read the same
+      // project data the Works page itself renders from, straight out
+      // of data/projects.json, rather than fetching and parsing the
+      // Works page's HTML. That HTML-scraping approach depended on
+      // real artwork sitting in the Works page's static markup, which
+      // stopped being true once that markup was trimmed down to a
+      // single placeholder fallback card — this doesn't have that
+      // dependency at all, so it isn't at risk of breaking again the
+      // next time that markup changes.
       try {
-        const worksUrl = new URL('../', window.location.href).href;
-        const response = await fetch(worksUrl);
-        const htmlText = await response.text();
-        const parsedDoc = new DOMParser().parseFromString(htmlText, 'text/html');
-        heroSources = collectHeroSources(parsedDoc, response.url || worksUrl);
+        const projectsUrl = new URL('../data/projects.json', window.location.href).href;
+        const response = await fetch(projectsUrl);
+        const list = await response.json();
+        heroSources = (Array.isArray(list) ? list : [])
+          .map(p => heroSourceFromProjectData(p, response.url || projectsUrl))
+          .filter(Boolean);
       } catch (err) {
-        console.warn('Hero banner: could not load artwork from the Works page.', err);
+        console.warn('Hero banner: could not load artwork from data/projects.json.', err);
         return;
       }
     }

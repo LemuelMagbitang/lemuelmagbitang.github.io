@@ -93,6 +93,23 @@
   .head-actions{display:flex;gap:10px;align-items:center;flex-shrink:0;}
   .save-status{font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:6px;}
   .save-status.saved{color:var(--good);}
+  .save-status.deploying{color:var(--warn);}
+  .save-status.deploying .dot{animation:pulse-dot 1.1s ease-in-out infinite;}
+  .save-status.deploy-failed{color:var(--danger);}
+  .save-status a{color:inherit;text-decoration:underline;text-underline-offset:2px;}
+  @keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+  /* Browse-button row (path input + folder-icon button). min-width:0
+     on the input is load-bearing, not decorative: a flex item's
+     default minimum width is its own content's intrinsic width, not
+     0 — so without this, a long path value or placeholder can force
+     the row wider than its container and push the button out (most
+     visible in the Thumbnail panel's two-column layout, where this
+     row lives in a half-width column). Short paths never showed it;
+     long ones always would have. */
+  .browse-row{display:flex;gap:8px;align-items:center;width:100%;}
+  .browse-row input{flex:1 1 auto;min-width:0;width:auto;}
+  .browse-row .icon-btn{flex-shrink:0;}
   .save-status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
 
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:18px;}
@@ -471,6 +488,13 @@ const GH = {
       throw new Error(e.message || `GitHub error ${res.status}`);
     }
     return res.json();
+  },
+  async getCheckRuns(sha){
+    const url = `https://api.github.com/repos/${conn.owner}/${conn.repo}/commits/${sha}/check-runs`;
+    const res = await fetch(url, { headers: authHeaders() });
+    if(!res.ok) return []; // don't fail the save over a status-check read
+    const data = await res.json();
+    return data.check_runs || [];
   }
 };
 
@@ -613,6 +637,7 @@ async function saveSection(name, obj, commitMessage){
   cache[name] = { json: obj, sha: result.content.sha, missing:false };
   dirty[name] = false;
   updateDirtyDots();
+  return result.commit && result.commit.sha; // the commit itself, for deploy-status tracking
 }
 
 /* =====================================================================
@@ -659,6 +684,65 @@ function wireSave(onCollect, name, filePath){
   }
 }
 
+/* Polls GitHub's own Pages-deploy check runs for a commit, so "saved"
+   can mean "the live site actually rebuilt from this", not just "the
+   commit went through". GitHub Pages builds usually take 20–60
+   seconds; this checks every 4s for up to 2 minutes. If the repo's
+   Pages setup doesn't use Actions (no check runs ever appear) this
+   quietly falls back to the plain "committed" message rather than
+   hanging in a "deploying" state forever. */
+async function trackDeployStatus(sha){
+  if (!sha) return;
+  const status = document.getElementById('saveStatus');
+  const statusText = document.getElementById('saveStatusText');
+  if (!status) return;
+
+  status.classList.remove('saved', 'deploy-failed');
+  status.classList.add('deploying');
+  statusText.textContent = 'Deploying…';
+
+  const deadline = Date.now() + 120000; // 2 minutes
+  let sawAnyCheck = false;
+
+  while (Date.now() < deadline) {
+    let runs;
+    try { runs = await GH.getCheckRuns(sha); }
+    catch(err){ runs = []; }
+
+    const pagesRuns = runs.filter(r => /pages/i.test(r.name || ''));
+    const relevant = pagesRuns.length ? pagesRuns : runs;
+
+    if (relevant.length) {
+      sawAnyCheck = true;
+      const allDone = relevant.every(r => r.status === 'completed');
+      if (allDone) {
+        const failed = relevant.find(r => r.conclusion && r.conclusion !== 'success');
+        if (failed) {
+          status.classList.remove('deploying');
+          status.classList.add('deploy-failed');
+          statusText.innerHTML = `Deploy failed — <a href="${attr(failed.html_url||'#')}" target="_blank">view details</a>`;
+        } else {
+          status.classList.remove('deploying');
+          status.classList.add('saved');
+          statusText.textContent = 'Live on site';
+        }
+        return;
+      }
+    }
+    await new Promise(r => setTimeout(r, 4000));
+  }
+
+  // Timed out without a clear answer — don't leave a spinner running
+  // forever, and don't claim success we didn't confirm.
+  status.classList.remove('deploying');
+  if (sawAnyCheck) {
+    statusText.textContent = 'Still deploying — check GitHub';
+  } else {
+    status.classList.add('saved');
+    statusText.textContent = 'Committed — check GitHub for deploy status';
+  }
+}
+
 document.getElementById('btnSaveTop').addEventListener('click', async () => {
   if (!currentSave) return;
   const { onCollect, name, filePath } = currentSave;
@@ -671,15 +755,12 @@ document.getElementById('btnSaveTop').addEventListener('click', async () => {
   const orig = btn.innerHTML;
   btn.innerHTML = '<i class="fa-solid fa-circle-notch spin"></i>&nbsp; Saving…';
   try{
-    await saveSection(name, obj, `CMS: update ${filePath}`);
+    const commitSha = await saveSection(name, obj, `CMS: update ${filePath}`);
     toast(`Saved — ${filePath} committed to ${conn.branch}.`);
-    const status = document.getElementById('saveStatus');
-    const statusText = document.getElementById('saveStatusText');
-    status.classList.add('saved');
-    statusText.textContent = 'All changes saved';
+    btn.disabled = false; btn.innerHTML = orig;
+    trackDeployStatus(commitSha); // don't await — runs in the background, save button is usable again immediately
   }catch(err){
     toast(err.message, true);
-  }finally{
     btn.disabled = false; btn.innerHTML = orig;
   }
 });
@@ -1771,14 +1852,13 @@ function openMediaPicker(onPick){
 // beyond that — a live preview, most often.
 function attachMediaBrowseButton(inputEl, onPicked){
   const row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:8px;align-items:center;';
+  row.className = 'browse-row';
   inputEl.parentNode.insertBefore(row, inputEl);
   row.appendChild(inputEl);
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'icon-btn';
   btn.title = 'Browse media library';
-  btn.style.flexShrink = '0';
   btn.innerHTML = '<i class="fa-solid fa-folder-open"></i>';
   row.appendChild(btn);
   btn.addEventListener('click', () => {
