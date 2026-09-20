@@ -12,12 +12,12 @@
     {
       "name": "Blender",
       "icon": "https://cdn.simpleicons.org/blender",
-      "useIcon": true
+      "useIcon": false
     },
     {
       "name": "Krita",
       "icon": "https://cdn.simpleicons.org/krita",
-      "useIcon": true
+      "useIcon": false
     },
     {
       "name": "Adobe After Effects",
@@ -42,7 +42,7 @@
     {
       "name": "Figma",
       "icon": "https://cdn.simpleicons.org/figma",
-      "useIcon": true
+      "useIcon": false
     }
   ],
   "multimediaSkills": [
