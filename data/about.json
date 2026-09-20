@@ -5,13 +5,13 @@
   "photo": {
     "src": "assets/projects/site/profile.jpg",
     "zoom": 1.1,
-    "focus": "81% 26%",
+    "focus": "50 50",
     "rotate": 0
   },
   "softwareSkills": [
     {
       "name": "Blender",
-      "icon": ""
+      "icon": "assets/projects/site/logos/blender_icon_512x512.png"
     },
     {
       "name": "Krita",
