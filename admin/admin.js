@@ -177,13 +177,14 @@ const GH = {
 /* =====================================================================
    2. TOASTS
    ===================================================================== */
-function toast(msg, isError){
+function toast(msg, isError, duration){
   const wrap = document.getElementById('toastWrap');
   const el = document.createElement('div');
   el.className = 'toast' + (isError ? ' error' : '');
   el.innerHTML = `<i class="fa-solid ${isError?'fa-triangle-exclamation':'fa-check'}" style="color:${isError?'#e0584f':'#2ecc71'};margin-right:8px;"></i>${msg}`;
   wrap.appendChild(el);
-  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, isError ? 5000 : 3200);
+  const ms = duration || (isError ? 5000 : 3200);
+  setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, ms);
 }
 
 /* =====================================================================
@@ -691,6 +692,35 @@ RENDERERS.settings = function(data){
     </div>
 
     <div class="panel">
+      <h3>Branding</h3>
+      <p class="panel-sub">Swap the nav-bar mark and browser-tab icon without touching any HTML. Leave either blank to keep the site's built-in default.</p>
+      <div class="two-col">
+        <div>
+          <div class="field"><label class="field-label">Site logo</label><input id="s_logo" value="${attr(s.siteLogo||'')}" placeholder="assets/projects/site/portfolio-logo.png"></div>
+          <p class="hint">Used for both the nav-bar mark and the brief flourish shown during page navigation — the same image, so both update together.</p>
+        </div>
+        <div>
+          <label class="field-label">Preview</label>
+          <div class="focus-picker" style="cursor:default;max-width:120px;" data-logo-preview>
+            ${s.siteLogo ? `<img src="${attr(s.siteLogo)}" style="width:100%;height:100%;object-fit:contain;padding:10px;box-sizing:border-box;" onerror="this.style.display='none'">` : `<span style="color:var(--text-dim);font-size:11px;text-align:center;padding:0 10px;">Default logo</span>`}
+          </div>
+        </div>
+      </div>
+      <div class="two-col" style="margin-top:16px;">
+        <div>
+          <div class="field"><label class="field-label">Favicon</label><input id="s_favicon" value="${attr(s.favicon||'')}" placeholder="assets/projects/site/favicon.png"></div>
+          <p class="hint">The small icon shown in the browser tab.</p>
+        </div>
+        <div>
+          <label class="field-label">Preview</label>
+          <div class="focus-picker" style="cursor:default;max-width:64px;" data-favicon-preview>
+            ${s.favicon ? `<img src="${attr(s.favicon)}" style="width:100%;height:100%;object-fit:contain;padding:6px;box-sizing:border-box;" onerror="this.style.display='none'">` : `<span style="color:var(--text-dim);font-size:10px;text-align:center;padding:0 6px;">Default</span>`}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
       <h3>Forms</h3>
       <p class="panel-sub">Web3Forms keys and where a successful submission redirects to.</p>
       <div class="row">
@@ -745,11 +775,28 @@ RENDERERS.settings = function(data){
     el.addEventListener('input', flagUnsaved);
   });
 
+  function wireBrandingPreview(inputId, previewSelector, padding){
+    const input = document.getElementById(inputId);
+    const preview = content.querySelector(previewSelector);
+    attachMediaBrowseButton(input, () => refresh());
+    input.addEventListener('input', refresh);
+    function refresh(){
+      const path = input.value.trim();
+      preview.innerHTML = path
+        ? `<img src="${attr(path)}" style="width:100%;height:100%;object-fit:contain;padding:${padding}px;box-sizing:border-box;" onerror="this.parentElement.innerHTML='&lt;span style=&quot;color:var(--danger);font-size:11px;text-align:center;padding:0 10px;&quot;&gt;Couldn\\'t load this path&lt;/span&gt;'">`
+        : `<span style="color:var(--text-dim);font-size:11px;text-align:center;padding:0 10px;">Default</span>`;
+    }
+  }
+  wireBrandingPreview('s_logo', '[data-logo-preview]', 10);
+  wireBrandingPreview('s_favicon', '[data-favicon-preview]', 6);
+
   wireSave(()=>({
     protectionEnabled: s.protectionEnabled,
     formsEnabled: { project: s.formsEnabled.project, review: s.formsEnabled.review },
     showCardBadges: s.showCardBadges,
     showReviews: s.showReviews,
+    siteLogo: val('s_logo'),
+    favicon: val('s_favicon'),
     web3forms: { projectKey: val('s_pkey'), reviewKey: val('s_rkey') },
     redirectUrl: val('s_redirect'),
     contactEmail: val('s_email'),
@@ -1478,14 +1525,20 @@ RENDERERS.about = function(data){
 
   // Simple Icons' CDN (cdn.simpleicons.org/{slug}) serves a brand's
   // logo with no API key and no upload — this covers the common case
-  // (Blender, Figma, every Adobe app, and hundreds more) without ever
-  // touching Media Library. Its slugs are just the brand name
-  // lowercased with everything but letters/numbers stripped, which is
-  // why this doesn't need a lookup table: "Adobe After Effects" ->
-  // "adobeaftereffects" is the real Simple Icons slug for it. A brand
-  // that isn't in Simple Icons (or is spelled differently there) just
-  // 404s — caught below and reported so Browse is the obvious next
-  // step instead of a silent failure.
+  // (Blender, Krita, Figma, and hundreds more) without ever touching
+  // Media Library. Its slugs are just the brand name lowercased with
+  // everything but letters/numbers stripped, which is why this
+  // doesn't need a lookup table: "Adobe After Effects" ->
+  // "adobeaftereffects" is genuinely the right slug for it.
+  //
+  // Adobe apps are a known, permanent exception, not a slug bug: as of
+  // Simple Icons v14 (Dec 2024), every Adobe product icon — Photoshop,
+  // Illustrator, After Effects, Premiere Pro, all of them — was
+  // removed from the library over trademark concerns. No slug fixes
+  // this; those icons simply don't exist there anymore for anyone.
+  // tryAutoLogo() below detects that case by name and says so plainly,
+  // rather than giving the same generic "not found" it gives for an
+  // actually-misspelled or obscure brand.
   function slugifyForSimpleIcons(name){
     return (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   }
@@ -1494,8 +1547,15 @@ RENDERERS.about = function(data){
     if (!slug) { toast('Type a skill name first.', true); return; }
     const url = `https://cdn.simpleicons.org/${slug}`;
     const test = new Image();
-    test.onload = () => { skill.icon = url; skill.useIcon = true; flagUnsaved(); onDone(); toast(`Found a logo for "${skill.name}".`); };
-    test.onerror = () => { toast(`Couldn't find an online logo for "${skill.name}" — try Browse instead, or check the spelling matches the brand name.`, true); };
+    test.onload = () => { skill.icon = url; skill.useIcon = true; flagUnsaved(); onDone(); toast(`Found a logo for "${esc(skill.name)}".`); };
+    test.onerror = () => {
+      const isAdobe = /adobe/i.test(skill.name);
+      const searchUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(skill.name + ' logo transparent png')}`;
+      const reason = isAdobe
+        ? `Simple Icons (the free source this checks) removed every Adobe app icon in 2024 over trademark concerns — that's an Adobe-wide gap, not something specific to "${esc(skill.name)}".`
+        : `Couldn't find "${esc(skill.name)}" in Simple Icons' library — it may not be listed there, or be spelled differently.`;
+      toast(`${reason} Try a <a href="${searchUrl}" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline">Google Image search</a>, save one, then Browse it in — or use Browse if you've already got a logo file in Media Library.`, true, 9000);
+    };
     test.src = url;
   }
 

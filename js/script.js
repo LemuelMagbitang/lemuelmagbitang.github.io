@@ -29,28 +29,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // enough reviews yet, or just want it off the page for a while.
   let SHOW_REVIEWS = false;
 
-  /* Looked up here, right at the top, instead of down in section 6
-     where the reviews marquee is actually built.
-
-     BUG THIS FIXES: applySettings() (right below) can call
-     applyReviewsVisibility(), which reads reviewsSection, the moment
-     data/settings.json finishes loading. That fetch resolves whenever
-     the network returns it — which can easily happen before the
-     script has finished running section 6, further down this same
-     file, is where reviewsSection used to be declared with `const`.
-
-     A `const` doesn't exist at all until its own line actually runs
-     (this is "the temporal dead zone") — so if the settings fetch won
-     the race, applyReviewsVisibility would reach for a variable that
-     technically wasn't there yet and throw
-     "Cannot access 'reviewsSection' before initialization", which is
-     exactly the error this was throwing in the console. Declaring
-     these three here, before anything async gets a chance to run,
-     means they're always ready no matter which fetch finishes first. */
-  const reviewsMarquee = document.querySelector('.reviews-marquee');
-  const reviewsTrack = document.getElementById('reviewsTrack');
-  const reviewsSection = document.querySelector('.reviews-section');
-
 
   /* =========================================
      0a. CMS OVERRIDE — SETTINGS
@@ -83,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function applySettings(remote) {
+  function applySettings(remote, siteRoot) {
     if (!remote || typeof remote !== 'object') return;
 
     if (typeof remote.protectionEnabled === 'boolean') PROTECTION_ENABLED = remote.protectionEnabled;
@@ -125,274 +103,54 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (remote.siteTitle) document.title = remote.siteTitle;
-  }
 
-  if (window.SETTINGS_URL) {
-    fetch(window.SETTINGS_URL)
-      .then(r => r.json())
-      .then(applySettings)
-      .catch(err => console.warn('Settings: could not load', window.SETTINGS_URL, err));
-  }
-
-
-  /* =========================================
-     0b. CMS OVERRIDE — PROJECTS
-     ========================================= */
-  /* If window.PROJECTS_URL points at data/projects.json, fetch it and,
-     when it returns a non-empty array, rebuild #portfolioGrid entirely
-     from that data. This has to happen — and finish — before anything
-     further down reads the grid: filtering, the hero banner's "5
-     latest artworks", and the lightbox click handlers each capture
-     the grid's cards once, early, into a fixed list. That's why this
-     is awaited before section 1 below, instead of firing in the
-     background the way hero text and settings do.
-
-     If the fetch fails, is empty, or window.PROJECTS_URL isn't set,
-     the static cards already written in this file are left exactly
-     as they are — that's the fallback, not an error state. */
-
-  function buildMediaItemEl(m) {
-    const el = document.createElement('div');
-    el.className = 'media-item';
-    if (m.type === 'video') el.setAttribute('data-video', m.src || '');
-    else if (m.type === 'youtube') el.setAttribute('data-youtube', m.src || '');
-    else el.setAttribute('data-image', m.src || '');
-    if (m.caption) el.setAttribute('data-description', m.caption);
-    if (m.orientation) el.setAttribute('data-orientation', m.orientation);
-    return el;
-  }
-
-  function buildProjectCardEl(p) {
-    const card = document.createElement('div');
-    const filters = Array.isArray(p.filters) ? p.filters.filter(Boolean) : [];
-    card.className = ['project-card', ...filters].join(' ');
-
-    if (p.badge) {
-      const badges = document.createElement('div');
-      badges.className = 'card-badges';
-      const span = document.createElement('span');
-      span.className = 'badge glass';
-      span.textContent = p.badge;
-      badges.appendChild(span);
-      card.appendChild(badges);
+    // siteLogo covers both the nav-bar mark (.site-logo) and the
+    // brief flourish shown during page navigation
+    // (.page-transition-logo) — same image, two spots, both swapped
+    // together since they're meant to always match. Resolved against
+    // siteRoot rather than used as-is because it's stored root-relative
+    // in settings.json (e.g. "assets/projects/site/portfolio-logo.png"),
+    // same convention as every other path in this file, and this
+    // function runs on pages at different folder depths.
+    if (remote.siteLogo && siteRoot) {
+      const resolved = new URL(remote.siteLogo, siteRoot).href;
+      document.querySelectorAll('.site-logo, .page-transition-logo').forEach(img => { img.src = resolved; });
     }
-
-    const thumb = document.createElement('div');
-    thumb.className = 'card-thumbnail';
-    const t = p.thumbnail || {};
-    if (t.src) {
-      // A real thumbnail image: focus/zoom go on the <img> itself,
-      // matching the convention already used in the static markup.
-      const img = document.createElement('img');
-      img.src = t.src;
-      img.alt = p.title || 'Project artwork';
-      if (t.focus) img.setAttribute('data-focus', t.focus);
-      if (t.zoom && Number(t.zoom) !== 1) img.setAttribute('data-zoom', t.zoom);
-      thumb.appendChild(img);
-    } else {
-      // No thumbnail set — leave it empty so fillMissingThumbnails()
-      // (section 1, right after this) fills it from the first media
-      // item, same as the static markup does. Focus/zoom go on the
-      // wrapper itself since there's no <img> yet to put them on.
-      if (t.focus) thumb.setAttribute('data-focus', t.focus);
-      if (t.zoom && Number(t.zoom) !== 1) thumb.setAttribute('data-zoom', t.zoom);
-    }
-    card.appendChild(thumb);
-
-    const info = document.createElement('div');
-    info.className = 'glass-info';
-    const h3 = document.createElement('h3');
-    h3.textContent = p.title || '';
-    const subtitleP = document.createElement('p');
-    subtitleP.textContent = p.subtitle || '';
-    info.appendChild(h3);
-    info.appendChild(subtitleP);
-    card.appendChild(info);
-
-    if (p.description) {
-      const descWrap = document.createElement('div');
-      descWrap.className = 'project-description';
-      descWrap.style.display = 'none';
-      const descP = document.createElement('p');
-      descP.textContent = p.description;
-      descWrap.appendChild(descP);
-      card.appendChild(descWrap);
-    }
-
-    const mediaList = document.createElement('div');
-    mediaList.className = 'project-media-list';
-    mediaList.style.display = 'none';
-    (Array.isArray(p.media) ? p.media : []).forEach(m => {
-      if (!m || !m.src) return;
-      mediaList.appendChild(buildMediaItemEl(m));
-    });
-    card.appendChild(mediaList);
-
-    return card;
-  }
-
-  async function loadProjectsFromCMS() {
-    if (!window.PROJECTS_URL) return;
-    const grid = document.getElementById('portfolioGrid');
-    if (!grid) return;
-
-    try {
-      const res = await fetch(window.PROJECTS_URL);
-      if (!res.ok) return;
-      const list = await res.json();
-      if (!Array.isArray(list) || !list.length) return;
-
-      const frag = document.createDocumentFragment();
-      list.forEach(p => frag.appendChild(buildProjectCardEl(p)));
-      grid.innerHTML = '';
-      grid.appendChild(frag);
-    } catch (err) {
-      console.warn('Projects: could not load', window.PROJECTS_URL, err);
-      // Leave the existing static cards in place.
+    if (remote.favicon && siteRoot) {
+      const resolved = new URL(remote.favicon, siteRoot).href;
+      const link = document.querySelector('link[rel="icon"]');
+      if (link) link.href = resolved;
     }
   }
-  await loadProjectsFromCMS();
 
-
-  /* =========================================
-     0c. CMS OVERRIDE — REVIEWS
-     ========================================= */
-  /* Same reasoning as projects: buildReviewsMarquee() (section 6,
-     further down) captures whatever's inside #reviewsTrack the first
-     time it runs and treats that as the permanent "pristine" set it
-     duplicates to build the scrolling loop. If the CMS cards weren't
-     in the DOM before that first run, they'd never make it into the
-     loop — so, same as projects, this is awaited up front rather than
-     fired in the background. */
-
-  function buildReviewCardEl(r) {
-    const card = document.createElement('div');
-    card.className = 'review-card';
-
-    const stars = document.createElement('div');
-    stars.className = 'review-stars';
-    const filled = Math.max(0, Math.min(5, Math.round(Number(r.stars) || 0)));
-    stars.textContent = '★'.repeat(filled) + '☆'.repeat(5 - filled);
-
-    const quote = document.createElement('p');
-    quote.className = 'review-quote';
-    quote.textContent = '"' + (r.quote || '') + '"';
-
-    const author = document.createElement('span');
-    author.className = 'review-author';
-    author.textContent = '— ' + (r.author || '');
-
-    card.appendChild(stars);
-    card.appendChild(quote);
-    card.appendChild(author);
-    return card;
-  }
-
-  async function loadReviewsFromCMS() {
-    if (!window.REVIEWS_URL) return;
-    const track = document.getElementById('reviewsTrack');
-    if (!track) return;
-
-    try {
-      const res = await fetch(window.REVIEWS_URL);
-      if (!res.ok) return;
-      const list = await res.json();
-      if (!Array.isArray(list) || !list.length) return;
-
-      const frag = document.createDocumentFragment();
-      list.forEach(r => frag.appendChild(buildReviewCardEl(r)));
-      track.innerHTML = '';
-      track.appendChild(frag);
-    } catch (err) {
-      console.warn('Reviews: could not load', window.REVIEWS_URL, err);
-      // Leave the existing static cards in place.
-    }
-  }
-  await loadReviewsFromCMS();
-
-
-  /* =========================================
-     0d. CMS OVERRIDE — ABOUT PAGE
-     ========================================= */
-  /* This one only ever does anything on about/index.html — it bails
-     immediately on every other page since #aboutHeadline doesn't
-     exist there. Nothing else in this file reads the about content,
-     so unlike projects/reviews there's no "must finish before X"
-     requirement here; it's awaited anyway just to keep every CMS
-     loader following the same shape. */
-
-  function buildTimelineBlock({ title, dateLine, bullets }) {
-    const item = document.createElement('div');
-    item.className = 'timeline-item clean-timeline';
-
-    const h4 = document.createElement('h4');
-    h4.textContent = title || '';
-    item.appendChild(h4);
-
-    if (dateLine) {
-      const span = document.createElement('span');
-      span.className = 'timeline-date';
-      span.textContent = dateLine;
-      item.appendChild(span);
-    }
-
-    const validBullets = (bullets || []).map(b => (b || '').trim()).filter(Boolean);
-    validBullets.forEach((b, i) => {
-      const p = document.createElement('p');
-      p.textContent = b;
-      item.appendChild(p);
-      if (i < validBullets.length - 1) item.appendChild(document.createElement('br'));
-    });
-
-    return item;
-  }
-
-
-  /* =========================================
-     0e. CMS OVERRIDE — FILTERS & BADGES
-     ========================================= */
-  /* Rebuilds the filter-tab buttons (homepage only) and the nav-bar
-     "Works" dropdown (every page that has one) from data/filters.json.
-     The ALL tab is never part of this data — it's structural, kept
-     exactly as already written in the HTML — matching the CMS plan's
-     own rule that ALL always exists automatically.
-
-     Same "must finish before it's read" requireme    applyCardBadgesVisibility();
-    applyFormToggle(document.getElementById('projectForm'), document.getElementById('projectEmailBtn'), FORMS_ENABLED.project);
-    applyFormToggle(document.getElementById('reviewForm'), document.getElementById('reviewEmailBtn'), FORMS_ENABLED.review);
-    applyReviewsVisibility();
-
-    if (remote.web3forms) {
-      setHiddenField('projectForm', 'apikey', remote.web3forms.projectKey);
-      setHiddenField('reviewForm', 'apikey', remote.web3forms.reviewKey);
-    }
-    if (remote.redirectUrl) {
-      setHiddenField('projectForm', 'redirect', remote.redirectUrl);
-      setHiddenField('reviewForm', 'redirect', remote.redirectUrl);
-    }
-
-    if (remote.contactEmail) {
-      document.querySelectorAll('a[href^="mailto:"]').forEach(a => {
-        const query = a.getAttribute('href').split('?')[1];
-        a.href = 'mailto:' + remote.contactEmail + (query ? '?' + query : '');
-      });
-    }
-
-    if (remote.socials) {
-      setSocialHref('instagram', remote.socials.instagram);
-      setSocialHref('tiktok', remote.socials.tiktok);
-      setSocialHref('youtube', remote.socials.youtube);
-    }
-
-    if (remote.siteTitle) document.title = remote.siteTitle;
-  }
-
-  if (window.SETTINGS_URL) {
-    fetch(window.SETTINGS_URL)
-      .then(r => r.json())
-      .then(applySettings)
-      .catch(err => console.warn('Settings: could not load', window.SETTINGS_URL, err));
-  }
+  // Fetches immediately (so the network request overlaps with
+  // everything else below rather than waiting its turn), but does NOT
+  // apply the result yet. applySettings() touches reviewsSection,
+  // filterBtns, and other consts that don't exist until sections 1–7
+  // further down have actually run — and since this fetch can resolve
+  // fast (it's a small file), calling applySettings() straight from
+  // this .then() risks firing during one of the `await`s below,
+  // before those consts are declared, which throws a
+  // "Cannot access '...' before initialization" TDZ error. Deferred
+  // to the very end of this function instead — see "APPLY DEFERRED
+  // SETTINGS" near the bottom — so it only ever runs once every const
+  // it touches is guaranteed to already exist, regardless of how fast
+  // or slow the fetch itself was.
+  const settingsPromise = window.SETTINGS_URL
+    ? fetch(window.SETTINGS_URL).then(async r => ({
+        json: await r.json(),
+        // data/settings.json always sits one folder below the site
+        // root, on every page, so "one level up from its own resolved
+        // URL" is a reliable, page-agnostic way to get the site root —
+        // works whether this fetch used 'data/settings.json' (home) or
+        // '../data/settings.json' (about), since r.url is always the
+        // final, absolute, already-resolved address.
+        siteRoot: new URL('../', r.url).href
+      })).catch(err => {
+        console.warn('Settings: could not load', window.SETTINGS_URL, err);
+        return null;
+      })
+    : Promise.resolve(null);
 
 
   /* =========================================
@@ -661,14 +419,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (bioEl && a.bio) bioEl.textContent = a.bio;
 
       const photoEl = document.getElementById('aboutPhoto');
-      // a.photo can be a plain path string (the original shape) or an
-      // object with zoom/focus/rotate alongside it, the same
-      // src-plus-adjustments shape a project's thumbnail already uses.
-      // Normalizing here means this works with data saved before the
-      // photo editor supported those fields, and with data saved after.
-      const photo = typeof a.photo === 'string' ? { src: a.photo } : (a.photo || {});
-      if (photoEl && photo.src) {
-        // a.photo.src is stored root-relative in data/about.json (e.g.
+      if (photoEl && a.photo) {
+        // a.photo is stored root-relative in data/about.json (e.g.
         // "assets/projects/site/profile.jpg"), the same way every path
         // in every data/*.json file is. That resolves fine wherever the
         // homepage reads it (the homepage *is* the site root), but this
@@ -678,14 +430,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // an already-absolute URL (https://...) passes through new URL()
         // completely unchanged, so pasting a full image URL still works.
         const siteRoot = new URL('../', window.location.href);
-        photoEl.src = new URL(photo.src, siteRoot).href;
-        // Same three adjustments a project thumbnail supports (see
-        // applyThumbnailAdjustments below), applied directly here
-        // since the profile photo isn't a .project-card thumbnail for
-        // that function to find on its own.
-        if (photo.focus) photoEl.style.objectPosition = photo.focus;
-        if (photo.zoom) photoEl.style.setProperty('--thumb-zoom', photo.zoom);
-        if (photo.rotate) photoEl.style.setProperty('--thumb-rotate', photo.rotate + 'deg');
+        photoEl.src = new URL(a.photo, siteRoot).href;
       }
 
       fillSkillList('softwareSkillsList', a.softwareSkills);
@@ -795,7 +540,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      0f. HOMEPAGE HERO — MESSAGES (fallback only)
      ========================================= */
   /* Hero messages now live in data/hero.json and are edited through
-     admin/ — see /README-CMS-SETUP.md. This single entry is a
+     admin.html — see /README-CMS-SETUP.md. This single entry is a
      fallback only, used if that fetch ever fails; it's not where you
      add real messages anymore. */
   const HERO_MESSAGES = [
@@ -1303,32 +1048,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       // dependency at all, so it isn't at risk of breaking again the
       // next time that markup changes.
       try {
-        const projectsUrl = new URL('../data/projects.json', window.location.href).href;
+        const siteRoot = new URL('../', window.location.href).href;
+        const projectsUrl = new URL('data/projects.json', siteRoot).href;
         const response = await fetch(projectsUrl);
         const list = await response.json();
-
-        // THE BUG THIS FIXES: every asset path in projects.json, like
-        // "assets/projects/haeru/haeru-logo-design.jpg", is meant to be
-        // resolved against the SITE ROOT — same convention as every
-        // other path in this file (see the big comment above
-        // collectHeroSources). This used to pass response.url (the
-        // fetched JSON file's own URL, something like
-        // ".../data/projects.json") as that resolution base instead.
-        // Resolving a relative path against a URL that ends in a
-        // filename replaces just that filename, not the whole
-        // directory — so "assets/projects/x.jpg" resolved against
-        // ".../data/projects.json" became ".../data/assets/projects/x.jpg",
-        // a URL that was never going to exist. That's exactly the
-        // 404s (and the blank hero banner they caused, since every
-        // slide was a broken image) in the About page console.
-        //
-        // siteRootUrl strips everything after the domain, giving the
-        // one base every one of these paths was actually written
-        // against.
-        const siteRootUrl = new URL('/', window.location.href).href;
-
+        // Asset paths inside projects.json (e.g. "assets/projects/...")
+        // are root-relative, same as everywhere else in this file — they
+        // must resolve against the site root, NOT against
+        // data/projects.json's own location, or every path gains an
+        // extra "data/" segment it was never meant to have.
         heroSources = (Array.isArray(list) ? list : [])
-          .map(p => heroSourceFromProjectData(p, siteRootUrl))
+          .map(p => heroSourceFromProjectData(p, siteRoot))
           .filter(Boolean);
       } catch (err) {
         console.warn('Hero banner: could not load artwork from data/projects.json.', err);
@@ -1566,8 +1296,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // leaving blank space — then loops infinitely. You only ever need to
   // write each review once in the HTML; this handles the rest, and
   // re-measures whenever the window is resized.
-  // reviewsMarquee / reviewsTrack / reviewsSection now declared at the
-  // very top of the file (section 0) — see the comment there for why.
+  const reviewsMarquee = document.querySelector('.reviews-marquee');
+  const reviewsTrack = document.getElementById('reviewsTrack');
+  const reviewsSection = document.querySelector('.reviews-section');
   let pristineTopCards = null;
   let pristineBottomCards = null;
 
@@ -1969,38 +1700,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  /* THE "CONTACT LANDS IN THE MIDDLE OF THE PAGE" FIX.
-
-     Clicking Contact from the About page is a real navigation to
-     index.html#contact-section. The browser's own native behavior is
-     to scroll to that element as soon as it exists in the DOM while
-     parsing — which, on this page, is well before the hero banner's
-     artwork images and the project thumbnails have finished
-     downloading. Both of those load in fully async, after the page
-     has already parsed, and both push everything below them further
-     down the page as they arrive. The native scroll already happened
-     against the page's shorter, not-yet-settled height — so by the
-     time everything finishes loading, the section itself has moved
-     down past wherever the page was left, which reads as "landed
-     somewhere in the middle" rather than at the section.
-
-     window's 'load' event fires only once every last resource —
-     images included — has actually finished, so re-scrolling to the
-     hash at that point uses the page's true, final layout. If 'load'
-     already fired by the time this runs (rare, but possible on a
-     fast cached reload), readyState is already 'complete' and this
-     runs immediately instead of waiting for an event that already
-     happened. */
-  function correctAnchorScrollOnceLoaded() {
-    if (!window.location.hash) return;
-    let target;
-    try { target = document.querySelector(window.location.hash); } catch (err) { return; }
-    if (target) target.scrollIntoView({ block: 'start' });
-  }
-  if (document.readyState === 'complete') {
-    correctAnchorScrollOnceLoaded();
-  } else {
-    window.addEventListener('load', correctAnchorScrollOnceLoaded, { once: true });
-  }
+  // Deferred settings apply — see the "0a. CMS OVERRIDE — SETTINGS"
+  // comment near the top for why this can't just be
+  // settingsPromise.then(applySettings) sitting up there instead. By
+  // the time execution reaches this line, every section above —
+  // including reviewsSection, filterBtns, and everything else
+  // applySettings() touches — has already run, regardless of how fast
+  // or slow the settings.json fetch itself was.
+  settingsPromise.then(result => {
+    if (result) applySettings(result.json, result.siteRoot);
+  });
 
 });
