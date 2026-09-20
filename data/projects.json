@@ -395,6 +395,53 @@
     ]
   },
   {
+    "id": "aol-design-case-study",
+    "title": "Arts of Lem (AOL) Gestalt Design Study",
+    "subtitle": "Re-engineering a personal logo through the Gestalt laws of visual perception",
+    "badge": "3D Design",
+    "filters": [
+      "3d-motion"
+    ],
+    "description": "A visual and theoretical breakdown of my old logo refinement process. By utilizing Gestalt principles, restructured through the Gestalt laws of visual perception",
+    "thumbnail": {
+      "src": "",
+      "focus": "50% 50%",
+      "zoom": 1
+    },
+    "media": [
+      {
+        "type": "image",
+        "src": "assets/projects/aol/figureground.jpg",
+        "caption": "",
+        "orientation": ""
+      },
+      {
+        "type": "image",
+        "src": "assets/projects/aol/continuity.jpg",
+        "caption": "",
+        "orientation": ""
+      },
+      {
+        "type": "image",
+        "src": "assets/projects/aol/combination.jpg",
+        "caption": "",
+        "orientation": ""
+      },
+      {
+        "type": "image",
+        "src": "assets/projects/aol/proximity.jpg",
+        "caption": "",
+        "orientation": ""
+      },
+      {
+        "type": "image",
+        "src": "assets/projects/aol/similarity.jpg",
+        "caption": "",
+        "orientation": ""
+      }
+    ]
+  },
+  {
     "id": "graphic-design",
     "title": "Commercial & Graphic Design",
     "subtitle": "Key Visuals & Editorial Layouts",
@@ -449,53 +496,6 @@
         "type": "image",
         "src": "assets/projects/graphic-design/wine-poster.jpg",
         "caption": "Premium Wine Brand Advertisement",
-        "orientation": ""
-      }
-    ]
-  },
-  {
-    "id": "aol-design-case-study",
-    "title": "Arts of Lem (AOL) Gestalt Design Study",
-    "subtitle": "Re-engineering a personal logo through the Gestalt laws of visual perception",
-    "badge": "3D Design",
-    "filters": [
-      "3d-motion"
-    ],
-    "description": "A visual and theoretical breakdown of my old logo refinement process. By utilizing Gestalt principles, restructured through the Gestalt laws of visual perception",
-    "thumbnail": {
-      "src": "",
-      "focus": "50% 50%",
-      "zoom": 1
-    },
-    "media": [
-      {
-        "type": "image",
-        "src": "assets/projects/aol/figureground.jpg",
-        "caption": "",
-        "orientation": ""
-      },
-      {
-        "type": "image",
-        "src": "assets/projects/aol/continuity.jpg",
-        "caption": "",
-        "orientation": ""
-      },
-      {
-        "type": "image",
-        "src": "assets/projects/aol/combination.jpg",
-        "caption": "",
-        "orientation": ""
-      },
-      {
-        "type": "image",
-        "src": "assets/projects/aol/proximity.jpg",
-        "caption": "",
-        "orientation": ""
-      },
-      {
-        "type": "image",
-        "src": "assets/projects/aol/similarity.jpg",
-        "caption": "",
         "orientation": ""
       }
     ]
