@@ -903,7 +903,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      0f. HOMEPAGE HERO — MESSAGES (fallback only)
      ========================================= */
   /* Hero messages now live in data/hero.json and are edited through
-     admin.html — see /README-CMS-SETUP.md. This single entry is a
+     admin/ — see /README-CMS-SETUP.md. This single entry is a
      fallback only, used if that fetch ever fails; it's not where you
      add real messages anymore. */
   const HERO_MESSAGES = [
