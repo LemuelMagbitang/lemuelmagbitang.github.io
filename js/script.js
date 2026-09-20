@@ -347,117 +347,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     return item;
   }
 
-  function fillSkillList(id, list) {
-    const ul = document.getElementById(id);
-    if (!ul || !Array.isArray(list) || !list.length) return;
-    ul.innerHTML = '';
-    // Multimedia skills are always plain strings. Software skills can
-    // now be either a plain string (older data, or a skill someone
-    // chose not to give a logo) or {name, icon} — a logo image instead
-    // of the name text. Handling both shapes here means this one
-    // function still covers both lists without needing to know which
-    // list it was called for.
-    const siteRoot = new URL('../', window.location.href);
-    list.forEach(s => {
-      const li = document.createElement('li');
-      const name = typeof s === 'string' ? s : (s && s.name) || '';
-      const icon = (s && typeof s === 'object') ? s.icon : '';
-      if (icon) {
-        li.classList.add('has-logo');
-        const img = document.createElement('img');
-        img.className = 'skill-logo';
-        img.alt = name; // read by screen readers even though the text itself isn't shown
-        img.title = name; // shows the name on hover, same info a text chip would give at a glance
-        img.loading = 'lazy';
-        img.src = new URL(icon, siteRoot).href;
-        li.appendChild(img);
-      } else {
-        li.textContent = name;
-      }
-      ul.appendChild(li);
-    });
-  }
-
-  async function loadAboutFromCMS() {
-    if (!window.ABOUT_URL) return;
-    const headlineEl = document.getElementById('aboutHeadline');
-    if (!headlineEl) return; // not the about page — nothing to do
-
-    try {
-      const res = await fetch(window.ABOUT_URL);
-      if (!res.ok) return;
-      const a = await res.json();
-      if (!a || typeof a !== 'object') return;
-
-      if (a.headline) headlineEl.textContent = a.headline;
-
-      const subheadEl = document.getElementById('aboutSubhead');
-      if (subheadEl && a.subhead) subheadEl.textContent = a.subhead;
-
-      const bioEl = document.getElementById('aboutBio');
-      if (bioEl && a.bio) bioEl.textContent = a.bio;
-
-      const photoEl = document.getElementById('aboutPhoto');
-      // a.photo can be a plain path string (the original shape) or an
-      // object with zoom/focus/rotate alongside it, the same
-      // src-plus-adjustments shape a project's thumbnail already uses.
-      // Normalizing here means this works with data saved before the
-      // photo editor supported those fields, and with data saved after.
-      const photo = typeof a.photo === 'string' ? { src: a.photo } : (a.photo || {});
-      if (photoEl && photo.src) {
-        // a.photo.src is stored root-relative in data/about.json (e.g.
-        // "assets/projects/site/profile.jpg"), the same way every path
-        // in every data/*.json file is. That resolves fine wherever the
-        // homepage reads it (the homepage *is* the site root), but this
-        // loader also runs on /about/ — one folder below root — where
-        // setting it directly would resolve to /about/assets/... and
-        // 404. Resolving it against the site root instead fixes that;
-        // an already-absolute URL (https://...) passes through new URL()
-        // completely unchanged, so pasting a full image URL still works.
-        const siteRoot = new URL('../', window.location.href);
-        photoEl.src = new URL(photo.src, siteRoot).href;
-        // Same three adjustments a project thumbnail supports (see
-        // applyThumbnailAdjustments below), applied directly here
-        // since the profile photo isn't a .project-card thumbnail for
-        // that function to find on its own.
-        if (photo.focus) photoEl.style.objectPosition = photo.focus;
-        if (photo.zoom) photoEl.style.setProperty('--thumb-zoom', photo.zoom);
-        if (photo.rotate) photoEl.style.setProperty('--thumb-rotate', photo.rotate + 'deg');
-      }
-
-      fillSkillList('softwareSkillsList', a.softwareSkills);
-      fillSkillList('multimediaSkillsList', a.multimediaSkills);
-
-      const expList = document.getElementById('experienceList');
-      if (expList && Array.isArray(a.experience) && a.experience.length) {
-        expList.innerHTML = '';
-        a.experience.forEach(exp => {
-          expList.appendChild(buildTimelineBlock({ title: exp.role, dateLine: exp.company, bullets: exp.bullets }));
-        });
-      }
-
-      const eduList = document.getElementById('educationList');
-      if (eduList && Array.isArray(a.education) && a.education.length) {
-        eduList.innerHTML = '';
-        a.education.forEach(e => {
-          eduList.appendChild(buildTimelineBlock({ title: e.title, dateLine: e.detail, bullets: [] }));
-        });
-      }
-
-      const awList = document.getElementById('awardsList');
-      if (awList && Array.isArray(a.awards) && a.awards.length) {
-        awList.innerHTML = '';
-        a.awards.forEach(aw => {
-          awList.appendChild(buildTimelineBlock({ title: aw.title, dateLine: aw.detail, bullets: [] }));
-        });
-      }
-    } catch (err) {
-      console.warn('About: could not load', window.ABOUT_URL, err);
-      // Leave the existing static content in place.
-    }
-  }
-  await loadAboutFromCMS();
-
 
   /* =========================================
      0e. CMS OVERRIDE — FILTERS & BADGES
@@ -723,17 +612,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!ul || !Array.isArray(list) || !list.length) return;
     ul.innerHTML = '';
     // Multimedia skills are always plain strings. Software skills can
-    // now be either a plain string (older data, or a skill someone
-    // chose not to give a logo) or {name, icon} — a logo image instead
-    // of the name text. Handling both shapes here means this one
-    // function still covers both lists without needing to know which
-    // list it was called for.
+    // be a plain string (older data, or a skill with no logo), or
+    // {name, icon, useIcon} — useIcon is the CMS's per-skill on/off
+    // switch, kept separate from icon itself so turning it off doesn't
+    // forget which logo was already found/chosen. Older saved data
+    // (before useIcon existed) has no such field at all — treated the
+    // same as "on" there, which is how every skill with a logo already
+    // behaved before this flag existed.
     const siteRoot = new URL('../', window.location.href);
     list.forEach(s => {
       const li = document.createElement('li');
       const name = typeof s === 'string' ? s : (s && s.name) || '';
       const icon = (s && typeof s === 'object') ? s.icon : '';
-      if (icon) {
+      const useIcon = (s && typeof s === 'object' && 'useIcon' in s) ? s.useIcon : true;
+      if (icon && useIcon) {
         li.classList.add('has-logo');
         const img = document.createElement('img');
         img.className = 'skill-logo';

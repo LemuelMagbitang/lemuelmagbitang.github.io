@@ -1243,12 +1243,21 @@ RENDERERS.about = function(data){
   let a = data.json || {};
   // Each software skill can be shown as its logo instead of its name
   // — see buildSoftwareSkills() below — so it's an object, not a
-  // plain string, going forward: {name, icon}. This normalizes older
-  // data (a plain array of strings) into that shape on load, so it
-  // still opens correctly instead of erroring on the first skill.
+  // plain string, going forward: {name, icon, useIcon}. This normalizes
+  // older data (a plain array of strings, or {name,icon} from before
+  // useIcon existed) into that shape on load, so it still opens
+  // correctly instead of erroring on the first skill. useIcon defaults
+  // to true whenever a logo is present — matching how every skill with
+  // a logo already behaved before this flag existed — so nothing that
+  // was showing a logo suddenly reverts to text just because this
+  // field didn't exist in older saved data.
   // Multimedia Skills has no logo option (styles like "3D Modeling"
   // don't have a brand mark to show), so it stays plain strings.
-  a.softwareSkills = (a.softwareSkills || []).map(s => typeof s === 'string' ? { name: s, icon: '' } : s);
+  a.softwareSkills = (a.softwareSkills || []).map(s => {
+    const skill = typeof s === 'string' ? { name: s, icon: '' } : { ...s };
+    if (skill.useIcon === undefined) skill.useIcon = !!skill.icon;
+    return skill;
+  });
   a.multimediaSkills = a.multimediaSkills || [];
   // Normalizes the old plain-string photo ("assets/.../profile.jpg")
   // into the same {src, zoom, focus, rotate} shape a project's
@@ -1436,32 +1445,93 @@ RENDERERS.about = function(data){
     repaint();
   }
 
+  // Small anchored dropdown used by the skill icon button below —
+  // "Find a logo online" / "Browse media library" / "Remove logo" all
+  // live behind one click instead of three permanent buttons crowding
+  // every pill, which was already tight on a phone-width screen.
+  function openActionMenu(anchorEl, actions){
+    document.querySelectorAll('.mini-action-menu').forEach(m => m.remove());
+    const rect = anchorEl.getBoundingClientRect();
+    const menu = document.createElement('div');
+    menu.className = 'mini-action-menu';
+    menu.style.top = (rect.bottom + 6) + 'px';
+    menu.style.left = rect.left + 'px';
+    menu.innerHTML = actions.map((a,i) => `<button type="button" data-i="${i}">${a.icon ? `<i class="fa-solid ${a.icon}"></i>` : ''}<span>${esc(a.label)}</span></button>`).join('');
+    document.body.appendChild(menu);
+    // Keep it on-screen if the anchor sits near the right edge (common
+    // on mobile, where these pills wrap tightly).
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.right > window.innerWidth - 8) {
+      menu.style.left = Math.max(8, window.innerWidth - menuRect.width - 8) + 'px';
+    }
+    menu.querySelectorAll('button').forEach((btn,i) => btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      menu.remove();
+      actions[i].onClick();
+    }));
+    setTimeout(() => {
+      document.addEventListener('click', function outside(e){
+        if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', outside); }
+      }, { once: true });
+    }, 0);
+  }
+
+  // Simple Icons' CDN (cdn.simpleicons.org/{slug}) serves a brand's
+  // logo with no API key and no upload — this covers the common case
+  // (Blender, Figma, every Adobe app, and hundreds more) without ever
+  // touching Media Library. Its slugs are just the brand name
+  // lowercased with everything but letters/numbers stripped, which is
+  // why this doesn't need a lookup table: "Adobe After Effects" ->
+  // "adobeaftereffects" is the real Simple Icons slug for it. A brand
+  // that isn't in Simple Icons (or is spelled differently there) just
+  // 404s — caught below and reported so Browse is the obvious next
+  // step instead of a silent failure.
+  function slugifyForSimpleIcons(name){
+    return (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+  function tryAutoLogo(skill, onDone){
+    const slug = slugifyForSimpleIcons(skill.name);
+    if (!slug) { toast('Type a skill name first.', true); return; }
+    const url = `https://cdn.simpleicons.org/${slug}`;
+    const test = new Image();
+    test.onload = () => { skill.icon = url; skill.useIcon = true; flagUnsaved(); onDone(); toast(`Found a logo for "${skill.name}".`); };
+    test.onerror = () => { toast(`Couldn't find an online logo for "${skill.name}" — try Browse instead, or check the spelling matches the brand name.`, true); };
+    test.src = url;
+  }
+
   // Software Skills' own version of buildTagBox: each entry is
-  // {name, icon} instead of a plain string, so every skill can be
-  // shown as its logo instead of its name on the live site. Kept
-  // separate from buildTagBox rather than adding an "icons?" flag to
-  // it, since Multimedia Skills (buildTagBox's only other caller)
-  // has no logo concept at all — categories like "3D Modeling" don't
-  // have a brand mark — so it stays exactly as simple as it was.
+  // {name, icon, useIcon} instead of a plain string, so every skill can
+  // be shown as its logo instead of its name on the live site, and
+  // switched between the two without losing whichever logo was already
+  // found or chosen. Kept separate from buildTagBox rather than adding
+  // an "icons?" flag to it, since Multimedia Skills (buildTagBox's only
+  // other caller) has no logo concept at all — categories like "3D
+  // Modeling" don't have a brand mark — so it stays exactly as simple
+  // as it was.
   function buildSoftwareSkills(id, arr){
     const box = document.getElementById(id);
     function repaint(){
       box.innerHTML = '';
       arr.forEach((skill,i)=>{
         const hasIcon = !!skill.icon;
+        const showingLogo = hasIcon && skill.useIcon;
         const pill = document.createElement('span');
         pill.className = 'tag-pill skill-pill';
         pill.innerHTML = `
-          <span class="skill-pill-icon" data-iconbtn title="${hasIcon ? 'Change logo' : 'Add a logo instead of text'}">${hasIcon ? `<img src="${attr(ghRawUrl(skill.icon))}" onerror="this.parentElement.innerHTML='<i class=&quot;fa-solid fa-image&quot;></i>'">` : '<i class="fa-solid fa-image"></i>'}</span>
+          <span class="skill-pill-icon" data-iconbtn title="Logo options">${hasIcon ? `<img src="${attr(ghRawUrl(skill.icon))}" onerror="this.parentElement.innerHTML='<i class=&quot;fa-solid fa-image&quot;></i>'">` : '<i class="fa-solid fa-image"></i>'}</span>
           <span class="skill-pill-name">${esc(skill.name)}</span>
-          ${hasIcon ? `<button type="button" class="clear-icon-btn" data-clearicon title="Use text instead of the logo">&times;</button>` : ''}
+          ${hasIcon ? `<button type="button" class="icon-toggle-btn" data-toggleicon title="${showingLogo ? 'Showing the logo on the live site — click to show the name instead' : 'Showing the name on the live site — click to show the logo instead'}"><i class="fa-solid ${showingLogo ? 'fa-toggle-on' : 'fa-toggle-off'}"></i></button>` : ''}
           <button type="button" data-removeskill title="Remove ${esc(skill.name)}">&times;</button>
         `;
-        pill.querySelector('[data-iconbtn]').addEventListener('click', ()=>{
-          openMediaPicker(path => { skill.icon = path; flagUnsaved(); repaint(); });
+        pill.querySelector('[data-iconbtn]').addEventListener('click', (e)=>{
+          openActionMenu(e.currentTarget, [
+            { label: 'Find a logo online', icon: 'fa-wand-magic-sparkles', onClick: () => tryAutoLogo(skill, repaint) },
+            { label: 'Browse media library', icon: 'fa-folder-open', onClick: () => openMediaPicker(path => { skill.icon = path; skill.useIcon = true; flagUnsaved(); repaint(); }) },
+            ...(hasIcon ? [{ label: 'Remove logo', icon: 'fa-trash', onClick: () => { skill.icon = ''; skill.useIcon = false; flagUnsaved(); repaint(); } }] : [])
+          ]);
         });
-        const clearBtn = pill.querySelector('[data-clearicon]');
-        if (clearBtn) clearBtn.addEventListener('click', (e)=>{ e.stopPropagation(); skill.icon = ''; flagUnsaved(); repaint(); });
+        const toggleBtn = pill.querySelector('[data-toggleicon]');
+        if (toggleBtn) toggleBtn.addEventListener('click', (e)=>{ e.stopPropagation(); skill.useIcon = !skill.useIcon; flagUnsaved(); repaint(); });
         pill.querySelector('[data-removeskill]').addEventListener('click', ()=>{ arr.splice(i,1); flagUnsaved(); repaint(); });
         box.appendChild(pill);
       });
@@ -1469,7 +1539,7 @@ RENDERERS.about = function(data){
       inp.placeholder = 'e.g. Blender';
       inp.addEventListener('keydown', e=>{
         if(e.key==='Enter' && inp.value.trim()){
-          e.preventDefault(); arr.push({ name: inp.value.trim(), icon: '' }); flagUnsaved(); repaint();
+          e.preventDefault(); arr.push({ name: inp.value.trim(), icon: '', useIcon: false }); flagUnsaved(); repaint();
         }
       });
       box.appendChild(inp);
@@ -1647,7 +1717,20 @@ function fileKind(path){
    as a font icon would. */
 const FOLDER_ICON_SVG = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.7c0-.94.76-1.7 1.7-1.7h4.46c.4 0 .78.15 1.08.42l1.3 1.18c.3.27.68.42 1.08.42h6.68c.94 0 1.7.76 1.7 1.7v9.08c0 .94-.76 1.7-1.7 1.7H4.7c-.94 0-1.7-.76-1.7-1.7V6.7z"/></svg>';
 const FILE_ICON_SVG = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h8l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1z"/><path d="M14 3.5v4h4" stroke-linecap="round"/></svg>';
+const PLAY_ICON_SVG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M7 4.2v15.6c0 .8.87 1.28 1.55.86l12.5-7.8a1 1 0 0 0 0-1.72l-12.5-7.8C7.87 2.92 7 3.4 7 4.2z"/></svg>';
 const BROKEN_IMAGE_SVG_ESCAPED = FILE_ICON_SVG.replace(/"/g, '&quot;');
+// Small badge pinned to a corner of a tile's thumbnail — used whenever
+// the thumbnail alone doesn't say what it is. A folder that happens to
+// preview an image inside it (see findFolderPreviewImage below) would
+// otherwise look exactly like an actual image file sitting at this
+// level; a video's <video> frame looks exactly like a still image until
+// it's played. Plain image tiles get no badge — they need no
+// disambiguating, and a badge on every tile would just be noise.
+function kindBadgeHtml(kind){
+  if (kind === 'folder') return `<span class="tile-kind-badge" title="Folder">${FOLDER_ICON_SVG}</span>`;
+  if (kind === 'video') return `<span class="tile-kind-badge" title="Video">${PLAY_ICON_SVG}</span>`;
+  return '';
+}
 
 // One shared builder for both the Media Library screen's own grid and
 // the "Choose a file" picker popup — previously each had its own
@@ -1661,11 +1744,14 @@ function folderTileHtml(name, previewPath){
   // in for every folder regardless of what it holds. previewPath
   // comes from findFolderPreviewImage() below; no image found (an
   // empty folder, or one with only videos/other files) still falls
-  // back to the folder icon.
+  // back to the folder icon, which needs no extra badge — it's already
+  // unambiguous. Once a photo preview replaces it, though, the badge
+  // is what keeps this readable as "a folder" rather than "an image".
   const thumbHtml = previewPath
     ? `<img src="${attr(ghRawUrl(previewPath))}" loading="lazy" onerror="this.parentElement.innerHTML='${FOLDER_ICON_SVG.replace(/"/g, '&quot;')}'">`
     : FOLDER_ICON_SVG;
-  return `<div class="thumb">${thumbHtml}</div><div class="meta"><div class="fname">${esc(name)}</div></div>`;
+  const badge = previewPath ? kindBadgeHtml('folder') : '';
+  return `<div class="thumb">${thumbHtml}${badge}</div><div class="meta"><div class="fname">${esc(name)}</div></div>`;
 }
 function fileTileHtml(item){
   const kind = fileKind(item.path);
@@ -1675,7 +1761,7 @@ function fileTileHtml(item){
     : kind === 'video'
     ? `<video src="${attr(ghRawUrl(item.path))}" muted preload="metadata"></video>`
     : FILE_ICON_SVG;
-  return `<div class="thumb">${thumbHtml}</div><div class="meta"><div class="fname">${esc(name)}</div></div>`;
+  return `<div class="thumb">${thumbHtml}${kindBadgeHtml(kind)}</div><div class="meta"><div class="fname">${esc(name)}</div></div>`;
 }
 
 // Recursively finds the first image anywhere inside folderPath — not
@@ -1782,7 +1868,25 @@ function openMediaPicker(onPick){
 
     grid.innerHTML = '';
     if (!folders.length && !files.length) {
-      grid.innerHTML = `<div class="banner muted" style="grid-column:1/-1">Nothing in this folder. Upload it from Media Library first.</div>`;
+      const empty = document.createElement('div');
+      empty.className = 'banner muted';
+      empty.style.cssText = 'grid-column:1/-1;flex-direction:column;align-items:flex-start;gap:10px;';
+      empty.innerHTML = `<span>Nothing in <strong style="color:#ddd">${esc(mediaPickerPath)}</strong> yet.</span>`;
+      const goBtn = document.createElement('button');
+      goBtn.type = 'button';
+      goBtn.className = 'primary';
+      goBtn.style.cssText = 'width:auto;padding:9px 16px;';
+      goBtn.textContent = 'Upload here in Media Library';
+      goBtn.addEventListener('click', () => {
+        // Jumps straight to the same folder that was empty here,
+        // rather than just closing the picker and leaving them to
+        // navigate to it again by hand.
+        mediaCurrentPath = mediaPickerPath;
+        close();
+        goToSection('media');
+      });
+      empty.appendChild(goBtn);
+      grid.appendChild(empty);
     }
     folders.forEach(f => {
       const tile = document.createElement('div');

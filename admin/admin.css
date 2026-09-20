@@ -134,6 +134,16 @@
   .skill-pill-icon i{font-size:10px;color:#555;}
   .skill-pill-name{white-space:nowrap;}
   .skill-pill .clear-icon-btn{color:#e0584f!important;font-size:10px!important;}
+  .icon-toggle-btn{color:var(--text-dim)!important;font-size:14px!important;padding:0 2px;}
+  .icon-toggle-btn i.fa-toggle-on{color:#5ee6a8;}
+  .icon-toggle-btn:hover{color:#fff!important;}
+  /* Anchored dropdown for the skill logo button (Find online / Browse /
+     Remove) — fixed-position so it floats above the tag box regardless
+     of where in a long, wrapped list of pills it was opened from. */
+  .mini-action-menu{position:fixed;z-index:2100;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);min-width:190px;overflow:hidden;padding:4px;}
+  .mini-action-menu button{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;background:none;border:none;border-radius:6px;color:#eee;font-size:12.5px;text-align:left;}
+  .mini-action-menu button:hover{background:rgba(255,255,255,.08);}
+  .mini-action-menu button i{width:14px;color:var(--text-dim);}
   .tagbox input{border:none;background:none;flex:1;min-width:120px;padding:5px;}
 
   .chip-select{display:flex;flex-wrap:wrap;gap:8px;}
@@ -288,6 +298,10 @@
   .media-tile .meta{padding:9px 10px;min-height:1px;background:rgba(255,255,255,.02);}
   .media-tile .fname{font-size:12.5px;font-weight:600;color:#fff!important;word-break:break-all;line-height:1.4;max-height:2.8em;overflow:hidden;display:block;}
   .media-tile .thumb svg{color:#7a7a7a;}
+  /* Corner badge distinguishing a folder-with-a-photo-preview or a
+     video frame from a plain image tile — see kindBadgeHtml() in JS. */
+  .media-tile .tile-kind-badge{position:absolute;left:6px;bottom:6px;width:22px;height:22px;border-radius:6px;background:rgba(10,10,10,.8);display:flex;align-items:center;justify-content:center;color:#fff;}
+  .media-tile .tile-kind-badge svg{color:#fff;}
   .media-tile .tile-actions{display:flex;gap:6px;padding:0 10px 10px;}
   .media-tile .tile-actions button{flex:1;padding:6px 4px;font-size:11px;}
   /* A file appears in the grid the instant it's dropped/chosen — using a

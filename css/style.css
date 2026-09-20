@@ -1077,15 +1077,17 @@ body {
 
 .resume-block.borderless h3 { color: #fff; font-size: 1.3rem; padding-bottom: 15px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.1); }
 
-.skill-list.minimal-list { list-style: none; display: flex; flex-wrap: wrap; gap: 12px; }
+.skill-list.minimal-list { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
 .skill-list.minimal-list li { background: rgba(255, 255, 255, 0.05); padding: 8px 18px; border-radius: 30px; font-size: 0.9rem; color: #ddd; letter-spacing: 0.5px; }
-/* A skill shown as a logo instead of its name keeps the same pill
-   shape and height as a text one — just tighter padding, since a
-   logo doesn't need the breathing room text does, and a fixed image
-   height so a wide logo and a tall one still sit at the same size
-   next to each other. */
-.skill-list.minimal-list li.has-logo { padding: 6px 16px; display: flex; align-items: center; }
-.skill-list.minimal-list li .skill-logo { height: 20px; width: auto; max-width: 100px; object-fit: contain; display: block; }
+/* A logo reads as a brand mark, not as a label — so instead of forcing
+   it into the same pill as the text entries (small, boxed, backed by
+   the same dark chip), it sits free with no background, sized bigger
+   than the pills around it so it actually reads as a logo rather than
+   a tiny icon squeezed to match their height. clamp() scales it with
+   the viewport instead of jumping between two fixed sizes at a single
+   breakpoint. */
+.skill-list.minimal-list li.has-logo { background: none; padding: 0; border-radius: 0; display: flex; align-items: center; }
+.skill-list.minimal-list li .skill-logo { height: clamp(30px, 4.2vw, 46px); width: auto; max-width: 150px; object-fit: contain; display: block; }
 
 .clean-timeline {
   margin-bottom: 30px;
@@ -1429,8 +1431,10 @@ body.center-page {
   .resume-main { gap: 40px; }
   
   .skill-list.minimal-list li { padding: 6px 14px; font-size: 0.8rem; }
-  .skill-list.minimal-list li.has-logo { padding: 5px 12px; }
-  .skill-list.minimal-list li .skill-logo { height: 17px; }
+  /* .has-logo and .skill-logo intentionally NOT overridden here anymore
+     — clamp() in the base rule already scales the logo fluidly down to
+     phone widths, and .has-logo has no padding/background left to
+     override now that it's not a pill. */
   
   .lightbox-nav { width: 36px; height: 36px; font-size: 0.8rem; }
   .lightbox-prev { left: 8px; }
