@@ -108,12 +108,12 @@
       <!-- Rebuilt from data/filters.json by script.js on every load.
            This ALL button is the only permanent one — everything else
            here is a fallback shown only if that fetch fails. Edit
-           filter tabs through admin.html, not here. -->
+           filter tabs through admin/, not here. -->
       <button class="tab-btn active" data-filter="all">ALL</button>
     </div>
 
     <!-- Project cards now live in data/projects.json and are edited
-         through admin.html — see /README-CMS-SETUP.md. Everything
+         through admin/ — see /README-CMS-SETUP.md. Everything
          inside #portfolioGrid below is rebuilt on every page load by
          script.js's loadProjectsFromCMS(). The single card kept here
          is a fallback only: it's what a visitor sees if that fetch
@@ -213,7 +213,7 @@
   <!-- CLIENT REVIEWS CAROUSEL -->
   <section class="container page-spacing reviews-section" style="border-top: 1px solid #222;">
     <!-- Reviews now live in data/reviews.json and are edited through
-         admin.html — see /README-CMS-SETUP.md. script.js rebuilds
+         admin/ — see /README-CMS-SETUP.md. script.js rebuilds
          #reviewsTrack from that file (and duplicates it to build the
          seamless scroll loop) before this section ever becomes
          visible. The one card kept here is a fallback only, shown if
@@ -274,7 +274,7 @@
        toggles/forms/socials/contact-email at data/settings.json, the
        whole project grid at data/projects.json, the client reviews
        strip at data/reviews.json, and the filter tabs + nav dropdown
-       at data/filters.json (all edited via admin.html). script.js
+       at data/filters.json (all edited via admin/). script.js
        keeps its hardcoded values/cards as an offline fallback, so
        nothing on the page is ever blank if these files are missing or
        you're previewing from file://. -->
