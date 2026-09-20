@@ -7,6 +7,36 @@ let currentSection = 'hero';
 let dirty = {};           // { hero: bool, ... }
 let cache = {};           // { hero: { json, sha } }
 
+/* THE FIX FOR "everything 404s with the CMS's own folder stuck in the
+   URL" — every preview image in this tool (project thumbnails, media
+   items, the profile photo, skill logos, folder previews) is built
+   from a path stored in data/*.json, like
+   "assets/projects/haeru/web-og-image.jpg". Those paths are written
+   to be resolved from the SITE ROOT — same rule the public site
+   itself follows everywhere.
+
+   A plain `<img src="assets/...">` resolves relative to wherever THIS
+   PAGE currently is, not the site root — so it only ever worked by
+   coincidence, back when this file lived at the repo root and "this
+   page" and "the site root" happened to be the same place. The moment
+   this tool moves anywhere else (a /admin/ folder, a subfolder, a
+   fresh CMS session opened from a different link), every one of those
+   previews breaks, because the browser goes looking for
+   ".../wherever-this-page-is/assets/..." instead.
+
+   Fetching every preview straight from GitHub's raw content instead
+   makes this permanently immune to that: it never depends on where
+   this tool itself is hosted or served from, ever again — only on
+   which repo it's connected to, which it already knows. */
+function ghRawUrl(path){
+  if (!path) return '';
+  // Already a full URL (http/https), an embedded data: image, or a
+  // local blob: preview for a file still mid-upload — none of those
+  // are repo-relative paths, so they pass through completely unchanged.
+  if (/^([a-z][a-z0-9+.-]*:)?\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')) return path;
+  return `https://raw.githubusercontent.com/${conn.owner}/${conn.repo}/${conn.branch}/${path.replace(/^\/+/, '')}`;
+}
+
 const SECTIONS = {
   hero:     { file: 'data/hero.json',     label: 'Hero Messages' },
   filters:  { file: 'data/filters.json',  label: 'Filters & Badges' },
@@ -855,7 +885,7 @@ function buildMediaPreviewHtml(m){
     return `<div class="media-preview"><span class="empty-note">Enter a source above to see a preview</span></div>`;
   }
   if (m.type === 'video') {
-    return `<div class="media-preview"><video src="${attr(m.src)}" muted preload="metadata" controls onerror="this.closest('.media-preview').innerHTML='&lt;span class=&quot;empty-note&quot;&gt;Couldn\\'t load this video — check the path&lt;/span&gt;'"></video></div>`;
+    return `<div class="media-preview"><video src="${attr(ghRawUrl(m.src))}" muted preload="metadata" controls onerror="this.closest('.media-preview').innerHTML='&lt;span class=&quot;empty-note&quot;&gt;Couldn\\'t load this video — check the path&lt;/span&gt;'"></video></div>`;
   }
   if (m.type === 'youtube') {
     const id = extractYouTubeId(m.src);
@@ -863,7 +893,7 @@ function buildMediaPreviewHtml(m){
     return `<div class="media-preview"><img src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="YouTube thumbnail"><span class="yt-badge">YOUTUBE</span></div>`;
   }
   // image
-  return `<div class="media-preview"><img src="${attr(m.src)}" alt="" onerror="this.closest('.media-preview').innerHTML='&lt;span class=&quot;empty-note&quot;&gt;Couldn\\'t load this image — check the path&lt;/span&gt;'"></div>`;
+  return `<div class="media-preview"><img src="${attr(ghRawUrl(m.src))}" alt="" onerror="this.closest('.media-preview').innerHTML='&lt;span class=&quot;empty-note&quot;&gt;Couldn\\'t load this image — check the path&lt;/span&gt;'"></div>`;
 }
 
 RENDERERS.projects = async function(data){
@@ -1022,7 +1052,7 @@ RENDERERS.projects = async function(data){
       const fallback = explicit ? '' : computeFallbackThumbSrc(p.media);
       const src = explicit || fallback;
       img.style.display = src ? '' : 'none';
-      if (src) img.src = src;
+      if (src) img.src = ghRawUrl(src);
       if (note) note.style.display = fallback ? '' : 'none';
     }
     attachMediaBrowseButton(el.querySelector('[data-f="thumb-src"]'), () => refreshThumbPreview());
@@ -1321,10 +1351,10 @@ RENDERERS.about = function(data){
       const src = a.photo.src.trim();
       const transform = `scale(${a.photo.zoom||1}) rotate(${a.photo.rotate||0}deg)`;
       photoPreviewBox.innerHTML = src
-        ? `<img src="${attr(src)}" style="width:100%;height:100%;object-fit:cover;display:block;object-position:${attr(a.photo.focus)};transform:${transform}" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-triangle-exclamation&quot; style=&quot;color:#e0584f;font-size:22px&quot;&gt;&lt;/i&gt;'">`
+        ? `<img src="${attr(ghRawUrl(src))}" style="width:100%;height:100%;object-fit:cover;display:block;object-position:${attr(a.photo.focus)};transform:${transform}" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-triangle-exclamation&quot; style=&quot;color:#e0584f;font-size:22px&quot;&gt;&lt;/i&gt;'">`
         : `<i class="fa-solid fa-user" style="color:#555;font-size:32px"></i>`;
       photoFocusImg.style.display = src ? '' : 'none';
-      if (src) photoFocusImg.src = src;
+      if (src) photoFocusImg.src = ghRawUrl(src);
     }
     function setPhotoCrosshairFromFocusStr(){
       const parts = (a.photo.focus||'50% 50%').split(' ').map(s=>parseFloat(s)||50);
@@ -1422,7 +1452,7 @@ RENDERERS.about = function(data){
         const pill = document.createElement('span');
         pill.className = 'tag-pill skill-pill';
         pill.innerHTML = `
-          <span class="skill-pill-icon" data-iconbtn title="${hasIcon ? 'Change logo' : 'Add a logo instead of text'}">${hasIcon ? `<img src="${attr(skill.icon)}" onerror="this.parentElement.innerHTML='<i class=&quot;fa-solid fa-image&quot;></i>'">` : '<i class="fa-solid fa-image"></i>'}</span>
+          <span class="skill-pill-icon" data-iconbtn title="${hasIcon ? 'Change logo' : 'Add a logo instead of text'}">${hasIcon ? `<img src="${attr(ghRawUrl(skill.icon))}" onerror="this.parentElement.innerHTML='<i class=&quot;fa-solid fa-image&quot;></i>'">` : '<i class="fa-solid fa-image"></i>'}</span>
           <span class="skill-pill-name">${esc(skill.name)}</span>
           ${hasIcon ? `<button type="button" class="clear-icon-btn" data-clearicon title="Use text instead of the logo">&times;</button>` : ''}
           <button type="button" data-removeskill title="Remove ${esc(skill.name)}">&times;</button>
@@ -1633,7 +1663,7 @@ function folderTileHtml(name, previewPath){
   // empty folder, or one with only videos/other files) still falls
   // back to the folder icon.
   const thumbHtml = previewPath
-    ? `<img src="${attr(previewPath)}" loading="lazy" onerror="this.parentElement.innerHTML='${FOLDER_ICON_SVG.replace(/"/g, '&quot;')}'">`
+    ? `<img src="${attr(ghRawUrl(previewPath))}" loading="lazy" onerror="this.parentElement.innerHTML='${FOLDER_ICON_SVG.replace(/"/g, '&quot;')}'">`
     : FOLDER_ICON_SVG;
   return `<div class="thumb">${thumbHtml}</div><div class="meta"><div class="fname">${esc(name)}</div></div>`;
 }
@@ -1641,9 +1671,9 @@ function fileTileHtml(item){
   const kind = fileKind(item.path);
   const name = item.path.split('/').pop();
   const thumbHtml = kind === 'image'
-    ? `<img src="${attr(item.path)}" loading="lazy" onerror="this.parentElement.innerHTML='${BROKEN_IMAGE_SVG_ESCAPED}'">`
+    ? `<img src="${attr(ghRawUrl(item.path))}" loading="lazy" onerror="this.parentElement.innerHTML='${BROKEN_IMAGE_SVG_ESCAPED}'">`
     : kind === 'video'
-    ? `<video src="${attr(item.path)}" muted preload="metadata"></video>`
+    ? `<video src="${attr(ghRawUrl(item.path))}" muted preload="metadata"></video>`
     : FILE_ICON_SVG;
   return `<div class="thumb">${thumbHtml}</div><div class="meta"><div class="fname">${esc(name)}</div></div>`;
 }
