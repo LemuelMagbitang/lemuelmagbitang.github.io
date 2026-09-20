@@ -130,20 +130,18 @@
   .skill-pill{padding-left:5px;}
   .skill-pill-icon{width:22px;height:22px;border-radius:5px;background:#0a0a0a;border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;flex-shrink:0;}
   .skill-pill-icon:hover{border-color:rgba(255,255,255,.3);}
-  .skill-pill-icon img{width:100%;height:100%;object-fit:contain;filter:grayscale(1) brightness(0) invert(88%);}
-  .skill-pill-icon i{font-size:10px;color:#555;}
+  .skill-pill-icon img{width:100%;height:100%;object-fit:contain;}
+  .skill-pill-icon .fallback-icon{font-size:10px;color:#555;}
   .skill-pill-name{white-space:nowrap;}
   .skill-pill .clear-icon-btn{color:#e0584f!important;font-size:10px!important;}
-  .icon-toggle-btn{color:var(--text-dim)!important;font-size:14px!important;padding:0 2px;}
-  .icon-toggle-btn i.fa-toggle-on{color:#5ee6a8;}
-  .icon-toggle-btn:hover{color:#fff!important;}
-  /* Anchored dropdown for the skill logo button (Find online / Browse /
-     Remove) — fixed-position so it floats above the tag box regardless
-     of where in a long, wrapped list of pills it was opened from. */
-  .mini-action-menu{position:fixed;z-index:2100;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);min-width:190px;overflow:hidden;padding:4px;}
-  .mini-action-menu button{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;background:none;border:none;border-radius:6px;color:#eee;font-size:12.5px;text-align:left;}
-  .mini-action-menu button:hover{background:rgba(255,255,255,.08);}
-  .mini-action-menu button i{width:14px;color:var(--text-dim);}
+  /* The logo/text toggle — two icons sharing one small pill-shaped
+     track, the inactive one dim, the active one lit. Click either
+     half; both trigger the same toggle since it's only ever two
+     states. */
+  .skill-toggle{display:flex;align-items:center;gap:0;background:#0a0a0a;border:1px solid var(--line-soft);border-radius:9px;padding:3px;cursor:pointer;flex-shrink:0;}
+  .skill-toggle i{font-size:9px;color:#555;padding:2px 5px;border-radius:6px;transition:background .15s,color .15s;}
+  .skill-toggle i.is-active{background:rgba(255,255,255,.12);color:#fff;}
+  .skill-toggle:hover i:not(.is-active){color:#999;}
   .tagbox input{border:none;background:none;flex:1;min-width:120px;padding:5px;}
 
   .chip-select{display:flex;flex-wrap:wrap;gap:8px;}
@@ -154,7 +152,7 @@
      (.project-card{aspect-ratio:1/1} in style.css) — cropping the focus
      point in a wide box here meant what you dragged never matched what
      the card actually showed. */
-  .focus-picker{position:relative;width:100%;max-width:220px;aspect-ratio:1/1;background:#0a0a0a repeating-conic-gradient(#151515 0% 25%,#0a0a0a 0% 50%) 0 0/16px 16px;border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:crosshair;}
+  .focus-picker{position:relative;width:100%;max-width:220px;aspect-ratio:1/1;background:#0a0a0a repeating-conic-gradient(#151515 0% 25%,#0a0a0a 0% 50%) 0 0/16px 16px;border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:crosshair;display:flex;align-items:center;justify-content:center;}
   .focus-picker img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;opacity:.55;}
   .focus-crosshair{position:absolute;width:16px;height:16px;border:2px solid #fff;border-radius:50%;background:rgba(255,255,255,.15);transform:translate(-50%,-50%);box-shadow:0 0 0 2000px rgba(0,0,0,0);pointer-events:none;}
   .focus-crosshair:before,.focus-crosshair:after{content:"";position:absolute;background:#fff;}
@@ -278,6 +276,15 @@
   .media-preview img,.media-preview video{width:100%;height:100%;object-fit:cover;display:block;}
   .media-preview .yt-badge{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.75);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.03em;}
   .media-preview .empty-note{color:var(--text-dim);font-size:12px;text-align:center;padding:0 14px;}
+  /* The "couldn't find this file" state — same spot .empty-note used
+     to sit in, now with an actual next step instead of just a
+     description. Shares the box it renders into (.media-preview, a
+     focus-picker, or the profile-photo preview) rather than needing
+     its own container, so it never needs bespoke sizing per spot. */
+  .missing-file-note{color:var(--text-dim);font-size:12px;text-align:center;padding:0 14px;line-height:1.6;}
+  .missing-file-note i{color:#e0584f;display:block;font-size:18px;margin-bottom:6px;}
+  .missing-file-note a{color:#fff;text-decoration:underline;font-weight:600;}
+  .missing-file-note a:hover{color:#ccc;}
 
   /* ---------- Media Library ---------- */
   .media-toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px;}
@@ -293,15 +300,16 @@
      being squeezed to nothing by a stray height rule elsewhere. */
   .media-tile{background:var(--panel-2);border:1px solid var(--line-soft);border-radius:9px;overflow:hidden;display:flex;flex-direction:column;}
   .media-tile .thumb{width:100%;aspect-ratio:1/1;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;flex-shrink:0;}
+  /* Folder / video cue — a small chip pinned to the corner of the
+     thumbnail, on top of whatever image is showing there. Never
+     appears on a plain image tile — that one already looks exactly
+     like what it is. */
+  .tile-badge{position:absolute;bottom:5px;right:5px;width:20px;height:20px;border-radius:5px;background:rgba(10,10,10,.82);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;pointer-events:none;}
   .media-tile .thumb img,.media-tile .thumb video{width:100%;height:100%;object-fit:cover;}
   .media-tile .thumb i{font-size:26px;color:#555;}
   .media-tile .meta{padding:9px 10px;min-height:1px;background:rgba(255,255,255,.02);}
   .media-tile .fname{font-size:12.5px;font-weight:600;color:#fff!important;word-break:break-all;line-height:1.4;max-height:2.8em;overflow:hidden;display:block;}
   .media-tile .thumb svg{color:#7a7a7a;}
-  /* Corner badge distinguishing a folder-with-a-photo-preview or a
-     video frame from a plain image tile — see kindBadgeHtml() in JS. */
-  .media-tile .tile-kind-badge{position:absolute;left:6px;bottom:6px;width:22px;height:22px;border-radius:6px;background:rgba(10,10,10,.8);display:flex;align-items:center;justify-content:center;color:#fff;}
-  .media-tile .tile-kind-badge svg{color:#fff;}
   .media-tile .tile-actions{display:flex;gap:6px;padding:0 10px 10px;}
   .media-tile .tile-actions button{flex:1;padding:6px 4px;font-size:11px;}
   /* A file appears in the grid the instant it's dropped/chosen — using a
