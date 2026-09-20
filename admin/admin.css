@@ -1,4 +1,4 @@
-  :root{
+:root{
     --bg:#121212; --panel:#171717; --panel-2:#1d1d1d; --line:rgba(255,255,255,.08);
     --line-soft:rgba(255,255,255,.05); --text:#ccc; --text-dim:#888; --white:#fff;
     --danger:#e0584f; --good:#2ecc71; --warn:#e0b04f; --radius:10px;
