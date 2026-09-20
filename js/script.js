@@ -29,6 +29,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   // enough reviews yet, or just want it off the page for a while.
   let SHOW_REVIEWS = false;
 
+  /* Looked up here, right at the top, instead of down in section 6
+     where the reviews marquee is actually built.
+
+     BUG THIS FIXES: applySettings() (right below) can call
+     applyReviewsVisibility(), which reads reviewsSection, the moment
+     data/settings.json finishes loading. That fetch resolves whenever
+     the network returns it — which can easily happen before the
+     script has finished running section 6, further down this same
+     file, is where reviewsSection used to be declared with `const`.
+
+     A `const` doesn't exist at all until its own line actually runs
+     (this is "the temporal dead zone") — so if the settings fetch won
+     the race, applyReviewsVisibility would reach for a variable that
+     technically wasn't there yet and throw
+     "Cannot access 'reviewsSection' before initialization", which is
+     exactly the error this was throwing in the console. Declaring
+     these three here, before anything async gets a chance to run,
+     means they're always ready no matter which fetch finishes first. */
+  const reviewsMarquee = document.querySelector('.reviews-marquee');
+  const reviewsTrack = document.getElementById('reviewsTrack');
+  const reviewsSection = document.querySelector('.reviews-section');
+
 
   /* =========================================
      0a. CMS OVERRIDE — SETTINGS
@@ -61,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function applySettings(remote, siteRoot) {
+  function applySettings(remote) {
     if (!remote || typeof remote !== 'object') return;
 
     if (typeof remote.protectionEnabled === 'boolean') PROTECTION_ENABLED = remote.protectionEnabled;
@@ -103,54 +125,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (remote.siteTitle) document.title = remote.siteTitle;
-
-    // siteLogo covers both the nav-bar mark (.site-logo) and the
-    // brief flourish shown during page navigation
-    // (.page-transition-logo) — same image, two spots, both swapped
-    // together since they're meant to always match. Resolved against
-    // siteRoot rather than used as-is because it's stored root-relative
-    // in settings.json (e.g. "assets/projects/site/portfolio-logo.png"),
-    // same convention as every other path in this file, and this
-    // function runs on pages at different folder depths.
-    if (remote.siteLogo && siteRoot) {
-      const resolved = new URL(remote.siteLogo, siteRoot).href;
-      document.querySelectorAll('.site-logo, .page-transition-logo').forEach(img => { img.src = resolved; });
-    }
-    if (remote.favicon && siteRoot) {
-      const resolved = new URL(remote.favicon, siteRoot).href;
-      const link = document.querySelector('link[rel="icon"]');
-      if (link) link.href = resolved;
-    }
   }
 
-  // Fetches immediately (so the network request overlaps with
-  // everything else below rather than waiting its turn), but does NOT
-  // apply the result yet. applySettings() touches reviewsSection,
-  // filterBtns, and other consts that don't exist until sections 1–7
-  // further down have actually run — and since this fetch can resolve
-  // fast (it's a small file), calling applySettings() straight from
-  // this .then() risks firing during one of the `await`s below,
-  // before those consts are declared, which throws a
-  // "Cannot access '...' before initialization" TDZ error. Deferred
-  // to the very end of this function instead — see "APPLY DEFERRED
-  // SETTINGS" near the bottom — so it only ever runs once every const
-  // it touches is guaranteed to already exist, regardless of how fast
-  // or slow the fetch itself was.
-  const settingsPromise = window.SETTINGS_URL
-    ? fetch(window.SETTINGS_URL).then(async r => ({
-        json: await r.json(),
-        // data/settings.json always sits one folder below the site
-        // root, on every page, so "one level up from its own resolved
-        // URL" is a reliable, page-agnostic way to get the site root —
-        // works whether this fetch used 'data/settings.json' (home) or
-        // '../data/settings.json' (about), since r.url is always the
-        // final, absolute, already-resolved address.
-        siteRoot: new URL('../', r.url).href
-      })).catch(err => {
-        console.warn('Settings: could not load', window.SETTINGS_URL, err);
-        return null;
-      })
-    : Promise.resolve(null);
+  if (window.SETTINGS_URL) {
+    fetch(window.SETTINGS_URL)
+      .then(r => r.json())
+      .then(applySettings)
+      .catch(err => console.warn('Settings: could not load', window.SETTINGS_URL, err));
+  }
 
 
   /* =========================================
@@ -370,28 +352,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!ul || !Array.isArray(list) || !list.length) return;
     ul.innerHTML = '';
     // Multimedia skills are always plain strings. Software skills can
-    // be a plain string (older data, or a skill with no logo), or
-    // {name, icon, useIcon} — useIcon is the CMS's per-skill on/off
-    // switch, kept separate from icon itself so turning it off doesn't
-    // forget which logo was already found/chosen. Older saved data
-    // (before useIcon existed) has no such field at all — treated the
-    // same as "on" there, which is how every skill with a logo already
-    // behaved before this flag existed.
+    // be a plain string (older data), or an object with a name plus
+    // an explicit useLogo toggle and an optional hand-picked icon.
+    // Handling every shape here means this one function still covers
+    // both lists without needing to know which list it was called for.
     const siteRoot = new URL('../', window.location.href);
     list.forEach(s => {
       const li = document.createElement('li');
       const name = typeof s === 'string' ? s : (s && s.name) || '';
-      const icon = (s && typeof s === 'object') ? s.icon : '';
-      const useIcon = (s && typeof s === 'object' && 'useIcon' in s) ? s.useIcon : true;
-      if (icon && useIcon) {
+      const manualIcon = (s && typeof s === 'object') ? s.icon : '';
+      // Older data saved before the explicit toggle existed only ever
+      // had {name, icon} — for that shape, "has an icon" is treated as
+      // "wants a logo", so nothing that already showed a logo silently
+      // reverts to plain text the first time this runs after the update.
+      const useLogo = (s && typeof s === 'object')
+        ? (s.useLogo !== undefined ? !!s.useLogo : !!manualIcon)
+        : false;
+
+      if (useLogo) {
         li.classList.add('has-logo');
         const img = document.createElement('img');
         img.className = 'skill-logo';
         img.alt = name; // read by screen readers even though the text itself isn't shown
         img.title = name; // shows the name on hover, same info a text chip would give at a glance
         img.loading = 'lazy';
-        img.src = new URL(icon, siteRoot).href;
         li.appendChild(img);
+
+        // If nothing that swaps li back to plain text runs, a failed
+        // load just leaves an empty broken-image box — this is the
+        // one guard against that for every path below.
+        img.onerror = () => { img.remove(); li.classList.remove('has-logo'); li.textContent = name; };
+
+        if (manualIcon) {
+          img.src = new URL(manualIcon, siteRoot).href;
+        } else {
+          // No logo picked by hand: try Simple Icons, a free public
+          // library of brand/product logos, keyed by a normalized
+          // slug of the name ("Adobe After Effects" ->
+          // "adobeaftereffects"). Covers a lot of well-known software
+          // without needing a file uploaded anywhere for it. Not every
+          // product is in there — img.onerror above is what makes a
+          // miss silently fall back to the name instead of showing a
+          // broken image on the live site.
+          const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          img.src = slug ? `https://cdn.simpleicons.org/${slug}` : '';
+          if (!slug) img.onerror();
+        }
       } else {
         li.textContent = name;
       }
@@ -419,8 +425,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (bioEl && a.bio) bioEl.textContent = a.bio;
 
       const photoEl = document.getElementById('aboutPhoto');
-      if (photoEl && a.photo) {
-        // a.photo is stored root-relative in data/about.json (e.g.
+      // a.photo can be a plain path string (the original shape) or an
+      // object with zoom/focus/rotate alongside it, the same
+      // src-plus-adjustments shape a project's thumbnail already uses.
+      // Normalizing here means this works with data saved before the
+      // photo editor supported those fields, and with data saved after.
+      const photo = typeof a.photo === 'string' ? { src: a.photo } : (a.photo || {});
+      if (photoEl && photo.src) {
+        // a.photo.src is stored root-relative in data/about.json (e.g.
         // "assets/projects/site/profile.jpg"), the same way every path
         // in every data/*.json file is. That resolves fine wherever the
         // homepage reads it (the homepage *is* the site root), but this
@@ -430,7 +442,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // an already-absolute URL (https://...) passes through new URL()
         // completely unchanged, so pasting a full image URL still works.
         const siteRoot = new URL('../', window.location.href);
-        photoEl.src = new URL(a.photo, siteRoot).href;
+        photoEl.src = new URL(photo.src, siteRoot).href;
+        // Same three adjustments a project thumbnail supports (see
+        // applyThumbnailAdjustments below), applied directly here
+        // since the profile photo isn't a .project-card thumbnail for
+        // that function to find on its own.
+        if (photo.focus) photoEl.style.objectPosition = photo.focus;
+        if (photo.zoom) photoEl.style.setProperty('--thumb-zoom', photo.zoom);
+        if (photo.rotate) photoEl.style.setProperty('--thumb-rotate', photo.rotate + 'deg');
       }
 
       fillSkillList('softwareSkillsList', a.softwareSkills);
@@ -540,7 +559,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      0f. HOMEPAGE HERO — MESSAGES (fallback only)
      ========================================= */
   /* Hero messages now live in data/hero.json and are edited through
-     admin.html — see /README-CMS-SETUP.md. This single entry is a
+     admin/ — see /README-CMS-SETUP.md. This single entry is a
      fallback only, used if that fetch ever fails; it's not where you
      add real messages anymore. */
   const HERO_MESSAGES = [
@@ -1048,17 +1067,32 @@ document.addEventListener('DOMContentLoaded', async () => {
       // dependency at all, so it isn't at risk of breaking again the
       // next time that markup changes.
       try {
-        const siteRoot = new URL('../', window.location.href).href;
-        const projectsUrl = new URL('data/projects.json', siteRoot).href;
+        const projectsUrl = new URL('../data/projects.json', window.location.href).href;
         const response = await fetch(projectsUrl);
         const list = await response.json();
-        // Asset paths inside projects.json (e.g. "assets/projects/...")
-        // are root-relative, same as everywhere else in this file — they
-        // must resolve against the site root, NOT against
-        // data/projects.json's own location, or every path gains an
-        // extra "data/" segment it was never meant to have.
+
+        // THE BUG THIS FIXES: every asset path in projects.json, like
+        // "assets/projects/haeru/haeru-logo-design.jpg", is meant to be
+        // resolved against the SITE ROOT — same convention as every
+        // other path in this file (see the big comment above
+        // collectHeroSources). This used to pass response.url (the
+        // fetched JSON file's own URL, something like
+        // ".../data/projects.json") as that resolution base instead.
+        // Resolving a relative path against a URL that ends in a
+        // filename replaces just that filename, not the whole
+        // directory — so "assets/projects/x.jpg" resolved against
+        // ".../data/projects.json" became ".../data/assets/projects/x.jpg",
+        // a URL that was never going to exist. That's exactly the
+        // 404s (and the blank hero banner they caused, since every
+        // slide was a broken image) in the About page console.
+        //
+        // siteRootUrl strips everything after the domain, giving the
+        // one base every one of these paths was actually written
+        // against.
+        const siteRootUrl = new URL('/', window.location.href).href;
+
         heroSources = (Array.isArray(list) ? list : [])
-          .map(p => heroSourceFromProjectData(p, siteRoot))
+          .map(p => heroSourceFromProjectData(p, siteRootUrl))
           .filter(Boolean);
       } catch (err) {
         console.warn('Hero banner: could not load artwork from data/projects.json.', err);
@@ -1296,9 +1330,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // leaving blank space — then loops infinitely. You only ever need to
   // write each review once in the HTML; this handles the rest, and
   // re-measures whenever the window is resized.
-  const reviewsMarquee = document.querySelector('.reviews-marquee');
-  const reviewsTrack = document.getElementById('reviewsTrack');
-  const reviewsSection = document.querySelector('.reviews-section');
+  // reviewsMarquee / reviewsTrack / reviewsSection now declared at the
+  // very top of the file (section 0) — see the comment there for why.
   let pristineTopCards = null;
   let pristineBottomCards = null;
 
@@ -1700,15 +1733,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Deferred settings apply — see the "0a. CMS OVERRIDE — SETTINGS"
-  // comment near the top for why this can't just be
-  // settingsPromise.then(applySettings) sitting up there instead. By
-  // the time execution reaches this line, every section above —
-  // including reviewsSection, filterBtns, and everything else
-  // applySettings() touches — has already run, regardless of how fast
-  // or slow the settings.json fetch itself was.
-  settingsPromise.then(result => {
-    if (result) applySettings(result.json, result.siteRoot);
-  });
+  /* THE "CONTACT LANDS IN THE MIDDLE OF THE PAGE" FIX.
+
+     Clicking Contact from the About page is a real navigation to
+     index.html#contact-section. The browser's own native behavior is
+     to scroll to that element as soon as it exists in the DOM while
+     parsing — which, on this page, is well before the hero banner's
+     artwork images and the project thumbnails have finished
+     downloading. Both of those load in fully async, after the page
+     has already parsed, and both push everything below them further
+     down the page as they arrive. The native scroll already happened
+     against the page's shorter, not-yet-settled height — so by the
+     time everything finishes loading, the section itself has moved
+     down past wherever the page was left, which reads as "landed
+     somewhere in the middle" rather than at the section.
+
+     window's 'load' event fires only once every last resource —
+     images included — has actually finished, so re-scrolling to the
+     hash at that point uses the page's true, final layout. If 'load'
+     already fired by the time this runs (rare, but possible on a
+     fast cached reload), readyState is already 'complete' and this
+     runs immediately instead of waiting for an event that already
+     happened. */
+  function correctAnchorScrollOnceLoaded() {
+    if (!window.location.hash) return;
+    let target;
+    try { target = document.querySelector(window.location.hash); } catch (err) { return; }
+    if (target) target.scrollIntoView({ block: 'start' });
+  }
+  if (document.readyState === 'complete') {
+    correctAnchorScrollOnceLoaded();
+  } else {
+    window.addEventListener('load', correctAnchorScrollOnceLoaded, { once: true });
+  }
 
 });
