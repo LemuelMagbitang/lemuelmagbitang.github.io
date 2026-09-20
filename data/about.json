@@ -11,31 +11,38 @@
   "softwareSkills": [
     {
       "name": "Blender",
-      "icon": "assets/projects/site/logos/blender_icon_512x512.png"
+      "icon": "https://cdn.simpleicons.org/blender",
+      "useIcon": true
     },
     {
       "name": "Krita",
-      "icon": ""
+      "icon": "https://cdn.simpleicons.org/krita",
+      "useIcon": true
     },
     {
       "name": "Adobe After Effects",
-      "icon": ""
+      "icon": "",
+      "useIcon": false
     },
     {
       "name": "Adobe Illustrator",
-      "icon": ""
+      "icon": "",
+      "useIcon": false
     },
     {
       "name": "Adobe Photoshop",
-      "icon": ""
+      "icon": "",
+      "useIcon": false
     },
     {
       "name": "Adobe Premiere Pro",
-      "icon": ""
+      "icon": "",
+      "useIcon": false
     },
     {
       "name": "Figma",
-      "icon": ""
+      "icon": "https://cdn.simpleicons.org/figma",
+      "useIcon": true
     }
   ],
   "multimediaSkills": [
