@@ -29,6 +29,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   // enough reviews yet, or just want it off the page for a while.
   let SHOW_REVIEWS = false;
 
+  // Shows every Software Skill as its logo instead of its name —
+  // one switch for the whole list, not a per-skill choice. A skill
+  // still shows its plain name whenever no logo is available at all
+  // (nothing hand-picked, and no automatic match), regardless of this.
+  let SHOW_SOFTWARE_LOGOS = false;
+
+  // Holds About's software-skills list once it loads, purely so
+  // applySettings (right below) can re-render that list if
+  // showSoftwareLogos arrives from data/settings.json AFTER
+  // data/about.json has already loaded and rendered once. Declared
+  // here, at the very top, for the same reason reviewsSection/
+  // reviewsTrack/reviewsMarquee are: applySettings can run the moment
+  // its own fetch resolves, which can happen before the rest of this
+  // script has finished running — so anything it touches has to
+  // already exist by then, not just be defined somewhere further down.
+  let cachedSoftwareSkills = null;
+
   /* Looked up here, right at the top, instead of down in section 6
      where the reviews marquee is actually built.
 
@@ -93,6 +110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (typeof remote.showCardBadges === 'boolean') SHOW_CARD_BADGES = remote.showCardBadges;
     if (typeof remote.showReviews === 'boolean') SHOW_REVIEWS = remote.showReviews;
+    if (typeof remote.showSoftwareLogos === 'boolean') SHOW_SOFTWARE_LOGOS = remote.showSoftwareLogos;
 
     // Re-apply every toggle-dependent bit of DOM now that the values
     // may have changed. PROTECTION_ENABLED needs no re-apply here — it's
@@ -101,6 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyFormToggle(document.getElementById('projectForm'), document.getElementById('projectEmailBtn'), FORMS_ENABLED.project);
     applyFormToggle(document.getElementById('reviewForm'), document.getElementById('reviewEmailBtn'), FORMS_ENABLED.review);
     applyReviewsVisibility();
+    applySoftwareLogosVisibility();
 
     if (remote.web3forms) {
       setHiddenField('projectForm', 'apikey', remote.web3forms.projectKey);
@@ -347,27 +366,55 @@ document.addEventListener('DOMContentLoaded', async () => {
     return item;
   }
 
+  // A short list of well-known creative/dev software whose company
+  // isn't reliably found by Simple Icons alone (below) — used as a
+  // second lookup source, keyed by the product's *domain* instead of
+  // a brand slug. Only needs entries for products actually worth
+  // covering; anything missing here just falls through to the next
+  // step instead of erroring.
+  const SOFTWARE_DOMAINS = {
+    krita: 'krita.org', blender: 'blender.org', figma: 'figma.com',
+    'davinci resolve': 'blackmagicdesign.com', 'cinema 4d': 'maxon.net',
+    zbrush: 'maxon.net', maya: 'autodesk.com', '3ds max': 'autodesk.com',
+    'autodesk maya': 'autodesk.com', unity: 'unity.com',
+    'unreal engine': 'unrealengine.com', procreate: 'procreate.com',
+    sketch: 'sketch.com', sketchup: 'sketchup.com',
+    'substance painter': 'substance3d.com', 'substance designer': 'substance3d.com',
+    'affinity photo': 'affinity.serif.com', 'affinity designer': 'affinity.serif.com',
+    'houdini': 'sidefx.com', 'clip studio paint': 'clipstudio.net'
+  };
+
+  // The fallback when no logo of any kind can be found and one is
+  // still wanted: initials, not the full name, so a skill that
+  // couldn't be matched to a logo still reads like a compact mark
+  // rather than suddenly breaking the row's rhythm with a full word.
+  // Multi-word names take one letter per word — except a short,
+  // already-compact word (a model number like "4D" or "3D") is kept
+  // whole rather than reduced to a single digit. A single-word name
+  // ("Blender", "Figma") has nothing to abbreviate, so it's shown
+  // exactly as typed instead of cut down to one cryptic letter.
+  function skillInitials(name) {
+    const words = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (words.length <= 1) return name || '';
+    return words.map(w => (w.length <= 2 || /\d/.test(w)) ? w.toUpperCase() : w[0].toUpperCase()).join('');
+  }
+
   function fillSkillList(id, list) {
     const ul = document.getElementById(id);
     if (!ul || !Array.isArray(list) || !list.length) return;
     ul.innerHTML = '';
-    // Multimedia skills are always plain strings. Software skills can
-    // be a plain string (older data), or an object with a name plus
-    // an explicit useLogo toggle and an optional hand-picked icon.
-    // Handling every shape here means this one function still covers
-    // both lists without needing to know which list it was called for.
+    // Multimedia skills are always plain strings, and never show a
+    // logo — a category like "3D Modeling" has no brand mark to show
+    // in the first place. Software skills can be a plain string
+    // (older data) or {name, icon}; whether they show as a logo at
+    // all is the one global SHOW_SOFTWARE_LOGOS switch, not a
+    // per-skill choice — see the switches at the top of this file.
     const siteRoot = new URL('../', window.location.href);
     list.forEach(s => {
       const li = document.createElement('li');
       const name = typeof s === 'string' ? s : (s && s.name) || '';
       const manualIcon = (s && typeof s === 'object') ? s.icon : '';
-      // Older data saved before the explicit toggle existed only ever
-      // had {name, icon} — for that shape, "has an icon" is treated as
-      // "wants a logo", so nothing that already showed a logo silently
-      // reverts to plain text the first time this runs after the update.
-      const useLogo = (s && typeof s === 'object')
-        ? (s.useLogo !== undefined ? !!s.useLogo : !!manualIcon)
-        : false;
+      const useLogo = (s && typeof s === 'object') && SHOW_SOFTWARE_LOGOS;
 
       if (useLogo) {
         li.classList.add('has-logo');
@@ -378,31 +425,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         img.loading = 'lazy';
         li.appendChild(img);
 
-        // If nothing that swaps li back to plain text runs, a failed
-        // load just leaves an empty broken-image box — this is the
-        // one guard against that for every path below.
-        img.onerror = () => { img.remove(); li.classList.remove('has-logo'); li.textContent = name; };
+        const domain = SOFTWARE_DOMAINS[name.toLowerCase()];
+        const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        // Tried in order — each source's failure is what triggers the
+        // next: a hand-picked file, then Simple Icons (a curated
+        // software/brand icon set — tried first since it's built
+        // specifically for this and its results are already
+        // monochrome-friendly), then Clearbit (a general company-logo
+        // lookup by domain — wider coverage, but a plain color
+        // wordmark rather than a purpose-made icon). Nothing found
+        // anywhere falls back to initials instead of a broken image.
+        const attempts = [];
+        if (manualIcon) attempts.push(new URL(manualIcon, siteRoot).href);
+        if (slug) attempts.push(`https://cdn.simpleicons.org/${slug}`);
+        if (domain) attempts.push(`https://logo.clearbit.com/${domain}?size=64`);
 
-        if (manualIcon) {
-          img.src = new URL(manualIcon, siteRoot).href;
-        } else {
-          // No logo picked by hand: try Simple Icons, a free public
-          // library of brand/product logos, keyed by a normalized
-          // slug of the name ("Adobe After Effects" ->
-          // "adobeaftereffects"). Covers a lot of well-known software
-          // without needing a file uploaded anywhere for it. Not every
-          // product is in there — img.onerror above is what makes a
-          // miss silently fall back to the name instead of showing a
-          // broken image on the live site.
-          const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          img.src = slug ? `https://cdn.simpleicons.org/${slug}` : '';
-          if (!slug) img.onerror();
-        }
+        let step = 0;
+        img.onerror = () => {
+          step += 1;
+          if (step < attempts.length) img.src = attempts[step];
+          else { img.remove(); li.classList.remove('has-logo'); li.textContent = skillInitials(name); }
+        };
+        if (attempts.length) img.src = attempts[0];
+        else { img.remove(); li.classList.remove('has-logo'); li.textContent = skillInitials(name); }
       } else {
         li.textContent = name;
       }
       ul.appendChild(li);
     });
+  }
+
+  // Re-renders the software skills list against whatever
+  // SHOW_SOFTWARE_LOGOS currently is. Called once About's own data
+  // finishes loading, and again from applySettings if the setting
+  // arrives after that — see the comment on SHOW_REVIEWS's own
+  // equivalent function for why both call sites matter here.
+  // (cachedSoftwareSkills itself is declared at the very top of this
+  // file, in section 0, for that same reason.)
+  function applySoftwareLogosVisibility() {
+    if (cachedSoftwareSkills) fillSkillList('softwareSkillsList', cachedSoftwareSkills);
   }
 
   async function loadAboutFromCMS() {
@@ -446,12 +507,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Same three adjustments a project thumbnail supports (see
         // applyThumbnailAdjustments below), applied directly here
         // since the profile photo isn't a .project-card thumbnail for
-        // that function to find on its own.
-        if (photo.focus) photoEl.style.objectPosition = photo.focus;
+        // that function to find on its own. transformOrigin has to
+        // match objectPosition here too, for the same reason it does
+        // on a project thumbnail — see the comment there.
+        if (photo.focus) { photoEl.style.objectPosition = photo.focus; photoEl.style.transformOrigin = photo.focus; }
         if (photo.zoom) photoEl.style.setProperty('--thumb-zoom', photo.zoom);
         if (photo.rotate) photoEl.style.setProperty('--thumb-rotate', photo.rotate + 'deg');
       }
 
+      cachedSoftwareSkills = a.softwareSkills;
       fillSkillList('softwareSkillsList', a.softwareSkills);
       fillSkillList('multimediaSkillsList', a.multimediaSkills);
 
@@ -833,7 +897,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       const zoom = img.getAttribute('data-zoom') || wrap.getAttribute('data-zoom');
       const rotate = img.getAttribute('data-rotate') || wrap.getAttribute('data-rotate');
 
-      if (focus) img.style.objectPosition = focus;
+      // transformOrigin has to match objectPosition, not just default
+      // to center — object-position decides which part of the image
+      // is visible at all; transform-origin decides which point the
+      // zoom scales FROM. Set focus without also moving the zoom's
+      // anchor to match, and zooming in visibly pulls away from
+      // wherever you dragged the focus point instead of magnifying
+      // it — exactly the bug this fixes. The hero banner's own
+      // focus/zoom (applyFocalPoint, above) already gets this right;
+      // this brings project thumbnails in line with it.
+      if (focus) { img.style.objectPosition = focus; img.style.transformOrigin = focus; }
       if (zoom) img.style.setProperty('--thumb-zoom', zoom);
       if (rotate) img.style.setProperty('--thumb-rotate', rotate + 'deg');
     });
