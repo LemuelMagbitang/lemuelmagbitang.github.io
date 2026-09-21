@@ -53,6 +53,74 @@ function handleMissingFile(el, kind){
   host.appendChild(note);
 }
 
+// Shared by Media Library's own dropzone and the "Choose a file"
+// picker's upload area — same upload mechanics either way (tile per
+// file, its own local preview the instant it's dropped, a progress
+// spinner, then swapped for the real uploaded version), so there's
+// exactly one place to fix if anything about uploading itself ever
+// needs to change. What happens once every file settles — which
+// screen re-navigates to show it — stays with each caller, since
+// Media Library and the picker want different things there.
+async function uploadFilesToFolder(fileList, folder, gridEl, currentTree){
+  const files = Array.from(fileList);
+  const emptyBanner = gridEl.querySelector('.banner.muted');
+  if (emptyBanner) emptyBanner.remove();
+
+  const jobs = files.map(file => {
+    const path = folder + '/' + file.name;
+    const isPreviewable = /^image\/|^video\//.test(file.type);
+    const localUrl = isPreviewable ? URL.createObjectURL(file) : null;
+    const tile = document.createElement('div');
+    tile.className = 'media-tile is-uploading';
+    const thumbInner = !localUrl ? FILE_ICON_SVG
+      : file.type.startsWith('video/') ? `<video src="${localUrl}" muted></video>`
+      : `<img src="${localUrl}">`;
+    tile.innerHTML = `
+      <div class="thumb">${thumbInner}<div class="upload-overlay"><i class="fa-solid fa-circle-notch spin"></i></div></div>
+      <div class="meta"><div class="fname">${esc(file.name)}</div></div>
+      <div class="upload-status">Uploading…</div>
+    `;
+    gridEl.prepend(tile);
+    return { file, path, tile, localUrl };
+  });
+
+  for (const job of jobs) {
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(job.file);
+      });
+      // Check for an existing file at this exact path first, so a
+      // same-name upload overwrites cleanly instead of erroring.
+      let existingSha = null;
+      const existing = currentTree.find(t => t.path === job.path);
+      if (existing) existingSha = existing.sha;
+
+      await GH.uploadBinary(job.path, dataUrl, `CMS: upload ${job.path}`, existingSha);
+
+      job.tile.classList.remove('is-uploading');
+      job.tile.classList.add('is-done');
+      const overlay = job.tile.querySelector('.upload-overlay');
+      if (overlay) overlay.remove();
+      const status = job.tile.querySelector('.upload-status');
+      if (status) status.remove();
+      toast(`Uploaded ${job.file.name}.`);
+    } catch(err){
+      job.tile.classList.remove('is-uploading');
+      job.tile.classList.add('is-error');
+      const overlay = job.tile.querySelector('.upload-overlay');
+      if (overlay) overlay.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#ff8f87"></i>';
+      const status = job.tile.querySelector('.upload-status');
+      if (status) status.textContent = 'Failed — ' + err.message;
+      toast(`${job.file.name}: ${err.message}`, true);
+    } finally {
+      if (job.localUrl) URL.revokeObjectURL(job.localUrl);
+    }
+  }
+}
+
 function ghRawUrl(path){
   if (!path) return '';
   // Already a full URL (http/https), an embedded data: image, or a
@@ -713,6 +781,7 @@ RENDERERS.settings = function(data){
       ${toggleRow('formsEnabled.review','"Leave a Review" form','Shows the form when on; shows an Email Me button when off.', s.formsEnabled.review)}
       ${toggleRow('showCardBadges','Project card badges','Shows the pill (e.g. "3D Design") on every project card.', s.showCardBadges)}
       ${toggleRow('showReviews','Reviews section','Shows or hides the whole client-reviews strip above the footer.', s.showReviews)}
+      ${toggleRow('showSoftwareLogos','Software skill logos','Shows every Software Skill (About page) as its logo instead of its name. One switch for the whole list — set a specific logo per skill from the About page itself.', s.showSoftwareLogos)}
     </div>
 
     <div class="panel">
@@ -775,6 +844,7 @@ RENDERERS.settings = function(data){
     formsEnabled: { project: s.formsEnabled.project, review: s.formsEnabled.review },
     showCardBadges: s.showCardBadges,
     showReviews: s.showReviews,
+    showSoftwareLogos: s.showSoftwareLogos,
     web3forms: { projectKey: val('s_pkey'), reviewKey: val('s_rkey') },
     redirectUrl: val('s_redirect'),
     contactEmail: val('s_email'),
@@ -1078,6 +1148,19 @@ RENDERERS.projects = async function(data){
       const src = explicit || fallback;
       img.style.display = src ? '' : 'none';
       if (src) img.src = ghRawUrl(src);
+      // Zoom and focus weren't actually reflected here before — this
+      // showed the raw image behind the crosshair with no crop or
+      // magnification at all, so there was nothing to confirm zoom
+      // was even doing anything until you saved and checked the live
+      // site. object-position AND transform-origin need to match —
+      // object-position decides what's visible, transform-origin
+      // decides what point the zoom scales from; set only the first
+      // and the zoom drifts away from wherever the crosshair is
+      // instead of magnifying it.
+      const focus = p.thumbnail.focus || '50% 50%';
+      img.style.objectPosition = focus;
+      img.style.transformOrigin = focus;
+      img.style.transform = `scale(${p.thumbnail.zoom || 1})`;
       if (note) note.style.display = fallback ? '' : 'none';
     }
     attachMediaBrowseButton(el.querySelector('[data-f="thumb-src"]'), () => refreshThumbPreview());
@@ -1328,7 +1411,7 @@ RENDERERS.about = function(data){
 
       <div class="panel">
         <h3>Software Skills</h3>
-        <p class="panel-sub">Each one can show its logo instead of the name — click the small square on any skill to add or change its logo, or clear it to go back to plain text.</p>
+        <p class="panel-sub">Click the small square on any skill to set a specific logo by hand — otherwise it's looked up automatically. Whether logos show at all, site-wide, is the "Software skill logos" switch in Settings &amp; Toggles.</p>
         <div class="tagbox" id="tags_software"></div>
       </div>
       <div class="panel">
@@ -1375,8 +1458,13 @@ RENDERERS.about = function(data){
     function refreshPhotoPreview(){
       const src = a.photo.src.trim();
       const transform = `scale(${a.photo.zoom||1}) rotate(${a.photo.rotate||0}deg)`;
+      // transform-origin has to match object-position here, same
+      // reasoning as the project thumbnail preview above — otherwise
+      // the zoom scales from dead center regardless of where the
+      // focus point actually is, which is exactly the "zoom doesn't
+      // zoom on that location" bug.
       photoPreviewBox.innerHTML = src
-        ? `<img src="${attr(ghRawUrl(src))}" style="width:100%;height:100%;object-fit:cover;display:block;object-position:${attr(a.photo.focus)};transform:${transform}" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-triangle-exclamation&quot; style=&quot;color:#e0584f;font-size:22px&quot; title=&quot;Couldn\\'t find this file — see the preview above&quot;&gt;&lt;/i&gt;'">`
+        ? `<img src="${attr(ghRawUrl(src))}" style="width:100%;height:100%;object-fit:cover;display:block;object-position:${attr(a.photo.focus)};transform-origin:${attr(a.photo.focus)};transform:${transform}" onerror="this.parentElement.innerHTML='&lt;i class=&quot;fa-solid fa-triangle-exclamation&quot; style=&quot;color:#e0584f;font-size:22px&quot; title=&quot;Couldn\\'t find this file — see the preview above&quot;&gt;&lt;/i&gt;'">`
         : `<i class="fa-solid fa-user" style="color:#555;font-size:32px"></i>`;
       photoFocusImg.style.display = src ? '' : 'none';
       if (src) photoFocusImg.src = ghRawUrl(src);
@@ -1472,8 +1560,35 @@ RENDERERS.about = function(data){
   // format Simple Icons (a free public library of brand/product
   // logos) keys its icons by. Same normalization used on the public
   // site's own copy of this lookup in script.js's fillSkillList.
+  // Same lookup chain as the public site's fillSkillList in script.js
+  // (manual icon → Simple Icons → Clearbit → initials) — kept here too
+  // so this swatch preview shows what a skill will actually look like
+  // rather than just "has an icon path or doesn't." Whether it's
+  // actually shown as a logo at all, site-wide, is the one switch in
+  // Settings & Toggles — this box just prepares each skill for
+  // whichever way that switch is set.
+  const SOFTWARE_DOMAINS = {
+    krita: 'krita.org', blender: 'blender.org', figma: 'figma.com',
+    'davinci resolve': 'blackmagicdesign.com', 'cinema 4d': 'maxon.net',
+    zbrush: 'maxon.net', maya: 'autodesk.com', '3ds max': 'autodesk.com',
+    'autodesk maya': 'autodesk.com', unity: 'unity.com',
+    'unreal engine': 'unrealengine.com', procreate: 'procreate.com',
+    sketch: 'sketch.com', sketchup: 'sketchup.com',
+    'substance painter': 'substance3d.com', 'substance designer': 'substance3d.com',
+    'affinity photo': 'affinity.serif.com', 'affinity designer': 'affinity.serif.com',
+    houdini: 'sidefx.com', 'clip studio paint': 'clipstudio.net'
+  };
   function skillLogoSlug(name){
     return (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+  function skillLogoAttempts(skill){
+    const attempts = [];
+    if (skill.icon) attempts.push(ghRawUrl(skill.icon));
+    const slug = skillLogoSlug(skill.name);
+    if (slug) attempts.push(`https://cdn.simpleicons.org/${slug}`);
+    const domain = SOFTWARE_DOMAINS[(skill.name || '').toLowerCase()];
+    if (domain) attempts.push(`https://logo.clearbit.com/${domain}?size=64`);
+    return attempts;
   }
 
   function buildSoftwareSkills(id, arr){
@@ -1481,28 +1596,27 @@ RENDERERS.about = function(data){
     function repaint(){
       box.innerHTML = '';
       arr.forEach((skill,i)=>{
-        const useLogo = skill.useLogo !== undefined ? !!skill.useLogo : !!skill.icon;
+        const attempts = skillLogoAttempts(skill);
         const hasManualIcon = !!skill.icon;
-        const slug = skillLogoSlug(skill.name);
         const pill = document.createElement('span');
         pill.className = 'tag-pill skill-pill';
         pill.innerHTML = `
-          <span class="skill-toggle" data-toggle title="${useLogo ? 'Showing the logo — click for plain text instead' : 'Showing plain text — click for a logo instead'}">
-            <i class="fa-solid fa-image ${useLogo ? 'is-active' : ''}"></i><i class="fa-solid fa-font ${!useLogo ? 'is-active' : ''}"></i>
-          </span>
-          ${useLogo ? `<span class="skill-pill-icon" data-iconbtn title="${hasManualIcon ? 'Change logo' : 'Looked up automatically — click to set one by hand instead'}">
-            <img src="${attr(hasManualIcon ? ghRawUrl(skill.icon) : (slug ? `https://cdn.simpleicons.org/${slug}` : ''))}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <span class="skill-pill-icon" data-iconbtn title="${hasManualIcon ? 'Change logo' : 'Click to set a specific logo by hand'}">
+            <img data-attempt="0" src="${attr(attempts[0] || '')}">
             <i class="fa-solid fa-image fallback-icon" style="display:none"></i>
-          </span>` : ''}
+          </span>
           <span class="skill-pill-name">${esc(skill.name)}</span>
-          ${useLogo && hasManualIcon ? `<button type="button" class="clear-icon-btn" data-clearicon title="Use the automatic lookup instead">&times;</button>` : ''}
+          ${hasManualIcon ? `<button type="button" class="clear-icon-btn" data-clearicon title="Use the automatic lookup instead">&times;</button>` : ''}
           <button type="button" data-removeskill title="Remove ${esc(skill.name)}">&times;</button>
         `;
-        pill.querySelector('[data-toggle]').addEventListener('click', ()=>{
-          skill.useLogo = !useLogo; flagUnsaved(); repaint();
+        const img = pill.querySelector('img');
+        if (!attempts.length) { img.style.display = 'none'; pill.querySelector('.fallback-icon').style.display = 'flex'; }
+        img.addEventListener('error', () => {
+          const next = parseInt(img.dataset.attempt, 10) + 1;
+          if (next < attempts.length) { img.dataset.attempt = next; img.src = attempts[next]; }
+          else { img.style.display = 'none'; pill.querySelector('.fallback-icon').style.display = 'flex'; }
         });
-        const iconBtn = pill.querySelector('[data-iconbtn]');
-        if (iconBtn) iconBtn.addEventListener('click', ()=>{
+        pill.querySelector('[data-iconbtn]').addEventListener('click', ()=>{
           openMediaPicker(path => { skill.icon = path; flagUnsaved(); repaint(); });
         });
         const clearBtn = pill.querySelector('[data-clearicon]');
@@ -1514,7 +1628,7 @@ RENDERERS.about = function(data){
       inp.placeholder = 'e.g. Blender';
       inp.addEventListener('keydown', e=>{
         if(e.key==='Enter' && inp.value.trim()){
-          e.preventDefault(); arr.push({ name: inp.value.trim(), icon: '', useLogo: false }); flagUnsaved(); repaint();
+          e.preventDefault(); arr.push({ name: inp.value.trim(), icon: '' }); flagUnsaved(); repaint();
         }
       });
       box.appendChild(inp);
@@ -1792,6 +1906,17 @@ function openMediaPicker(onPick){
       <div style="padding:14px 20px 0;flex-shrink:0;">
         <div class="media-folder-crumb" id="pickerCrumbs"></div>
       </div>
+      <!-- Same dropzone as Media Library, so you don't have to close
+           this, go find that screen, upload, then come back and
+           re-navigate to where you were — drop or pick a file and it
+           uploads straight into whichever folder is open right now. -->
+      <div style="padding:10px 20px 0;flex-shrink:0;">
+        <div class="dropzone dropzone-compact" id="pickerDropzone">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          Drag a file here, or click to upload it into this folder
+          <input type="file" id="pickerFileInput" multiple style="display:none">
+        </div>
+      </div>
       <!-- height:min(82vh,640px) above turns this into a fixed-size
            window instead of one that only happens to be tall enough
            for however many folders/files are in view right now — so
@@ -1801,7 +1926,7 @@ function openMediaPicker(onPick){
            viewport. overscroll-behavior:contain keeps a fast scroll to
            the end of a long folder from bleeding into the page behind
            the modal, the same fix already used on the lightbox. -->
-      <div class="media-grid" id="pickerGrid" style="padding:4px 20px 20px;overflow-y:auto;overscroll-behavior:contain;flex:1 1 auto;min-height:0;"></div>
+      <div class="media-grid" id="pickerGrid" style="padding:14px 20px 20px;overflow-y:auto;overscroll-behavior:contain;flex:1 1 auto;min-height:0;"></div>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -1813,6 +1938,22 @@ function openMediaPicker(onPick){
     if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
   });
 
+  const pickerDropzone = overlay.querySelector('#pickerDropzone');
+  const pickerFileInput = overlay.querySelector('#pickerFileInput');
+  pickerDropzone.addEventListener('click', () => pickerFileInput.click());
+  pickerFileInput.addEventListener('change', () => handlePickerUpload(pickerFileInput.files));
+  ['dragenter','dragover'].forEach(evt => pickerDropzone.addEventListener(evt, e => { e.preventDefault(); pickerDropzone.classList.add('hover'); }));
+  ['dragleave','drop'].forEach(evt => pickerDropzone.addEventListener(evt, e => { e.preventDefault(); pickerDropzone.classList.remove('hover'); }));
+  pickerDropzone.addEventListener('drop', e => { if (e.dataTransfer.files.length) handlePickerUpload(e.dataTransfer.files); });
+
+  let pickerTree = null; // set by paintPicker below, read here for sha lookups on overwrite
+  async function handlePickerUpload(fileList){
+    const grid = overlay.querySelector('#pickerGrid');
+    await uploadFilesToFolder(fileList, mediaPickerPath || 'assets', grid, pickerTree || []);
+    await loadMediaTree(true);
+    paintPicker();
+  }
+
   async function paintPicker(){
     const grid = overlay.querySelector('#pickerGrid');
     let tree;
@@ -1821,6 +1962,7 @@ function openMediaPicker(onPick){
       grid.innerHTML = `<div class="banner info" style="grid-column:1/-1;border-color:rgba(224,88,79,.4)">Couldn't load your files — ${esc(err.message)}</div>`;
       return;
     }
+    pickerTree = tree; // read by handlePickerUpload above for overwrite sha lookups
 
     const { folders, files } = childrenOfPath(tree, mediaPickerPath);
     const crumbs = mediaPickerPath.split('/');
@@ -1843,15 +1985,10 @@ function openMediaPicker(onPick){
     if (!folders.length && !files.length) {
       // Actionable, not just descriptive — clicking through to Media
       // Library and picking up right where you left off (a fresh
-      // Choose a File next time will already have whatever you
-      // upload there) beats a dead-end sentence telling you to go
-      // find that tab yourself.
-      grid.innerHTML = `<div class="banner muted" style="grid-column:1/-1">Nothing in this folder yet. <a href="#" data-goto-media style="color:#fff;text-decoration:underline">Go to Media Library</a> to upload something here.</div>`;
-      grid.querySelector('[data-goto-media]').addEventListener('click', (e) => {
-        e.preventDefault();
-        close();
-        goToSection('media');
-      });
+      // Now that this popup can upload directly (see the dropzone
+      // above), an empty folder is just a plain heads-up rather than
+      // a dead end pointing you somewhere else.
+      grid.innerHTML = `<div class="banner muted" style="grid-column:1/-1">Nothing here yet — drag a file into the box above, or click it to choose one.</div>`;
     }
     folders.forEach(f => {
       const tile = document.createElement('div');
@@ -2076,74 +2213,8 @@ RENDERERS.media = async function(){
 
     async function handleFiles(fileList){
       const folder = document.getElementById('uploadPath').value.trim().replace(/^\/+|\/+$/g,'') || 'assets';
-      const files = Array.from(fileList);
       const grid = document.getElementById('mediaGrid');
-
-      // Every file gets a real tile the instant it's dropped/chosen —
-      // its own local preview (from the file itself, via
-      // createObjectURL, before any network request has even started)
-      // plus a spinner overlay — instead of the dropzone showing one
-      // spinner-text line while the grid stays completely blank until
-      // the whole batch finishes. This is what makes it feel instant
-      // like dragging a file into a folder, the way GitHub's own
-      // uploader does, rather than a silent wait.
-      const emptyBanner = grid.querySelector('.banner.muted');
-      if (emptyBanner) emptyBanner.remove();
-
-      const jobs = files.map(file => {
-        const path = folder + '/' + file.name;
-        const isPreviewable = /^image\/|^video\//.test(file.type);
-        const localUrl = isPreviewable ? URL.createObjectURL(file) : null;
-        const tile = document.createElement('div');
-        tile.className = 'media-tile is-uploading';
-        const thumbInner = !localUrl ? FILE_ICON_SVG
-          : file.type.startsWith('video/') ? `<video src="${localUrl}" muted></video>`
-          : `<img src="${localUrl}">`;
-        tile.innerHTML = `
-          <div class="thumb">${thumbInner}<div class="upload-overlay"><i class="fa-solid fa-circle-notch spin"></i></div></div>
-          <div class="meta"><div class="fname">${esc(file.name)}</div></div>
-          <div class="upload-status">Uploading…</div>
-        `;
-        grid.prepend(tile);
-        return { file, path, tile, localUrl };
-      });
-
-      for (const job of jobs) {
-        try {
-          const dataUrl = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(job.file);
-          });
-          // Check for an existing file at this exact path first, so a
-          // same-name upload overwrites cleanly instead of erroring.
-          let existingSha = null;
-          const existing = tree.find(t => t.path === job.path);
-          if (existing) existingSha = existing.sha;
-
-          await GH.uploadBinary(job.path, dataUrl, `CMS: upload ${job.path}`, existingSha);
-
-          job.tile.classList.remove('is-uploading');
-          job.tile.classList.add('is-done');
-          const overlay = job.tile.querySelector('.upload-overlay');
-          if (overlay) overlay.remove();
-          const status = job.tile.querySelector('.upload-status');
-          if (status) status.remove();
-          toast(`Uploaded ${job.file.name}.`);
-        } catch(err){
-          job.tile.classList.remove('is-uploading');
-          job.tile.classList.add('is-error');
-          const overlay = job.tile.querySelector('.upload-overlay');
-          if (overlay) overlay.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color:#ff8f87"></i>';
-          const status = job.tile.querySelector('.upload-status');
-          if (status) status.textContent = 'Failed — ' + err.message;
-          toast(`${job.file.name}: ${err.message}`, true);
-        } finally {
-          if (job.localUrl) URL.revokeObjectURL(job.localUrl);
-        }
-      }
-
+      await uploadFilesToFolder(fileList, folder, grid, tree);
       // Full refresh once the batch settles — this is what replaces the
       // temporary tiles above with the real, permanent ones (with their
       // Copy path / Delete buttons) sourced from the actual repo state.
