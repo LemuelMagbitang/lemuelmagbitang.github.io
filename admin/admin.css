@@ -134,14 +134,6 @@
   .skill-pill-icon .fallback-icon{font-size:10px;color:#555;}
   .skill-pill-name{white-space:nowrap;}
   .skill-pill .clear-icon-btn{color:#e0584f!important;font-size:10px!important;}
-  /* The logo/text toggle — two icons sharing one small pill-shaped
-     track, the inactive one dim, the active one lit. Click either
-     half; both trigger the same toggle since it's only ever two
-     states. */
-  .skill-toggle{display:flex;align-items:center;gap:0;background:#0a0a0a;border:1px solid var(--line-soft);border-radius:9px;padding:3px;cursor:pointer;flex-shrink:0;}
-  .skill-toggle i{font-size:9px;color:#555;padding:2px 5px;border-radius:6px;transition:background .15s,color .15s;}
-  .skill-toggle i.is-active{background:rgba(255,255,255,.12);color:#fff;}
-  .skill-toggle:hover i:not(.is-active){color:#999;}
   .tagbox input{border:none;background:none;flex:1;min-width:120px;padding:5px;}
 
   .chip-select{display:flex;flex-wrap:wrap;gap:8px;}
@@ -290,6 +282,11 @@
   .media-toolbar{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px;}
   .media-toolbar .field{flex:1;min-width:200px;margin-bottom:0;}
   .dropzone{border:1.5px dashed var(--line);border-radius:10px;padding:26px;text-align:center;color:var(--text-dim);font-size:13px;margin-bottom:22px;transition:border-color .15s, background .15s;cursor:pointer;}
+  /* Same dropzone, sized down for sitting inside the picker popup
+     rather than a full page — less vertical padding so it doesn't
+     compete with the grid below it for the popup's limited height. */
+  .dropzone-compact{padding:12px;font-size:12px;margin-bottom:0;}
+  .dropzone-compact i{font-size:14px;margin-right:4px;}
   .dropzone.hover{border-color:#fff;background:rgba(255,255,255,.04);color:#fff;}
   .dropzone i{font-size:22px;display:block;margin-bottom:8px;color:#666;}
   .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;align-content:start;}
