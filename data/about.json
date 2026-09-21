@@ -4,8 +4,8 @@
   "bio": "I'm Lemuel Magbitang, a multidisciplinary designer specializing in 2D/3D illustration, motion graphics, brand design, and UI/UX. My approach is to create engaging, high-quality visual experiences by combining technical precision with a clean, polished aesthetic.",
   "photo": {
     "src": "assets/projects/site/profile.jpg",
-    "zoom": 1,
-    "focus": "50% 50%",
+    "zoom": 1.35,
+    "focus": "98% 2%",
     "rotate": 0
   },
   "softwareSkills": [
@@ -18,19 +18,19 @@
       "icon": ""
     },
     {
-      "name": "Adobe After Effects",
+      "name": "After Effects",
       "icon": ""
     },
     {
-      "name": "Adobe Illustrator",
+      "name": "Illustrator",
       "icon": ""
     },
     {
-      "name": "Adobe Photoshop",
+      "name": "Premier Pro",
       "icon": ""
     },
     {
-      "name": "Adobe Premiere Pro",
+      "name": "Photoshop",
       "icon": ""
     },
     {
