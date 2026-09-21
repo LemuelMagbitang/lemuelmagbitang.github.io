@@ -11,38 +11,31 @@
   "softwareSkills": [
     {
       "name": "Blender",
-      "icon": "",
-      "useLogo": false
+      "icon": ""
     },
     {
       "name": "Krita",
-      "icon": "",
-      "useLogo": false
+      "icon": ""
     },
     {
       "name": "Adobe After Effects",
-      "icon": "",
-      "useLogo": false
+      "icon": ""
     },
     {
       "name": "Adobe Illustrator",
-      "icon": "",
-      "useLogo": false
+      "icon": ""
     },
     {
       "name": "Adobe Photoshop",
-      "icon": "",
-      "useLogo": false
+      "icon": ""
     },
     {
       "name": "Adobe Premiere Pro",
-      "icon": "",
-      "useLogo": false
+      "icon": ""
     },
     {
       "name": "Figma",
-      "icon": "",
-      "useLogo": false
+      "icon": ""
     }
   ],
   "multimediaSkills": [
