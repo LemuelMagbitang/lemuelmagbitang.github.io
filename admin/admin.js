@@ -1173,8 +1173,17 @@ RENDERERS.projects = async function(data){
           p.thumbnail.src = inp.value;
           refreshThumbPreview();
         }
-        else if(f==='thumb-zoom') p.thumbnail.zoom = parseFloat(inp.value)||1;
-        else if(f==='thumb-focus'){ p.thumbnail.focus = inp.value; setFromFocusStr(); }
+        // THE FIX: typing a new zoom or focus value used to update
+        // p.thumbnail but never re-render refreshThumbPreview() —
+        // only loading a new image (thumb-src, above) did that. So
+        // the preview looked frozen on whatever it last showed while
+        // you adjusted the very things it's supposed to demonstrate,
+        // which read as "zoom isn't doing what I typed" even though
+        // the saved value was correct all along. Now every field that
+        // touches the crop calls refreshThumbPreview() the same way
+        // Profile Photo's equivalent fields already did.
+        else if(f==='thumb-zoom') { p.thumbnail.zoom = parseFloat(inp.value)||1; refreshThumbPreview(); }
+        else if(f==='thumb-focus'){ p.thumbnail.focus = inp.value; setFromFocusStr(); refreshThumbPreview(); }
         else {
           p[f] = inp.value;
           if (f==='title' || f==='badge') {
@@ -1220,6 +1229,15 @@ RENDERERS.projects = async function(data){
       p.thumbnail.focus = `${x.toFixed(0)}% ${y.toFixed(0)}%`;
       crosshair.style.left = x+'%'; crosshair.style.top = y+'%';
       el.querySelector('[data-f="thumb-focus"]').value = p.thumbnail.focus;
+      // THE FIX: this updated the crosshair dot's own position and the
+      // text field beside it, but never touched the actual preview
+      // image — so dragging looked like it worked (the dot moved) while
+      // the crop/zoom shown never changed to match. Same gap the Zoom
+      // and Focus text fields just above had, and the same fix: call
+      // the one function that actually re-renders the image with the
+      // current zoom + focus + rotate, on every change, not just once
+      // when the project is first opened.
+      refreshThumbPreview();
       flagUnsaved();
     }
     let dragging=false;
