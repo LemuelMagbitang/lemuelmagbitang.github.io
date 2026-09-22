@@ -553,74 +553,6 @@ body {
 }
 
 /* =========================================
-   ABOUT ME SECTION
-   ========================================= */
-.resume-section { display: flex; flex-direction: column; gap: 70px; max-width: 1000px; margin: 0 auto; }
-.profile-pic-large {
-  width: 240px; height: 240px; border-radius: 50%; object-fit: cover;
-  /* Same zoom/rotate mechanism as a project's thumbnail (see
-     .card-thumbnail img above) — set from data/about.json's photo.zoom
-     / photo.rotate via script.js, defaulting to no change here. focus
-     comes through as a plain object-position, set the same way. */
-  --thumb-zoom: 1;
-  --thumb-rotate: 0deg;
-  transform: scale(var(--thumb-zoom)) rotate(var(--thumb-rotate));
-  transition: transform 0.4s ease, object-position 0.4s ease;
-}
-
-/* LAYOUT: skills row on top, everything else full width beneath it.
-
-   Was two tall columns side by side — skills on the left, the entire
-   career on the right — which left a long empty gutter under the
-   short skills column and squeezed the experience text into half the
-   page. Now the two h.nav-item-dropdown { position: relative; }
-
-.nav-dropdown-toggle { display: inline-flex; align-items: center; gap: 6px; }
-.nav-caret { font-size: 0.6rem; transition: transform 0.2s ease; }
-.nav-item-dropdown:hover .nav-caret { transform: rotate(180deg); }
-
-.nav-dropdown-menu {
-  list-style: none;
-  position: absolute;
-  /* Sits flush against the nav row (no real gap) — a floating gap is
-     what breaks hover: the cursor exits the "Works" link's hoverable
-     box before it reaches the menu, so the menu closes mid-move. Flush
-     positioning means there's no dead zone to cross. The breathing
-     room you'd visually want from a gap comes from this box's own
-     top padding instead, which stays part of the hoverable area. */
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%) translateY(-6px);
-  margin-top: 0;
-  padding: 18px 0 10px;
-  min-width: 170px;
-  background: rgba(18, 18, 18, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s ease;
-}
-
-.nav-item-dropdown:hover .nav-dropdown-menu,
-.nav-item-dropdown:focus-within .nav-dropdown-menu {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateX(-50%) translateY(0);
-}
-
-.nav-dropdown-menu li { text-align: center; }
-.nav-dropdown-menu a {
-  display: block;
-  padding: 9px 22px;
-  white-space: nowrap;
-  font-size: 0.78rem;
-}
-
-/* =========================================
    HERO SECTION
    ========================================= */
 .hero-section {
@@ -1032,8 +964,30 @@ body {
    ABOUT ME SECTION
    ========================================= */
 .resume-section { display: flex; flex-direction: column; gap: 70px; max-width: 1000px; margin: 0 auto; }
+/* THE FIX for the photo bleeding into whatever sits below it once
+   zoomed in: .photo-frame is the fixed-size, actually-circular box —
+   the thing everything else lays out around — and it clips anything
+   that overflows it. .profile-pic-large (the <img> itself) just
+   fills that box completely and is free to be scaled/rotated/
+   repositioned however zoom and focus need, because the frame around
+   it catches whatever spills past its edges.
+   Without this wrapper, scaling the <img> directly scaled its own
+   border-radius circle right along with it — a 128px circle at 1.35×
+   zoom became a ~173px circle, still perfectly round, just bigger
+   than the space the layout had reserved for it, which is what let
+   it visually overlap the heading below it on a phone. A project
+   thumbnail never had this problem because .project-card (its
+   ancestor two levels up) already has overflow: hidden — this gives
+   the profile photo that exact same protection. */
+.photo-frame {
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
 .profile-pic-large {
-  width: 240px; height: 240px; border-radius: 50%; object-fit: cover;
+  width: 100%; height: 100%; object-fit: cover; display: block;
   /* Same zoom/rotate mechanism as a project's thumbnail (see
      .card-thumbnail img above) — set from data/about.json's photo.zoom
      / photo.rotate via script.js, defaulting to no change here. focus
@@ -1786,7 +1740,7 @@ body.center-page {
   text-align: left;
 }
 
-.about-hero-overlay .profile-pic-large {
+.about-hero-overlay .photo-frame {
   width: 220px;
   height: 220px;
   flex-shrink: 0;
@@ -1886,7 +1840,7 @@ body.center-page {
     line-height: 1.75;
     padding-top: 20px;
   }
-  .about-hero-overlay .profile-pic-large {
+  .about-hero-overlay .photo-frame {
     width: 128px;
     height: 128px;
     margin-top: 0;
