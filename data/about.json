@@ -50,6 +50,8 @@
     {
       "role": "Design Co-Founder & Chief Creative Officer (CCO)",
       "company": "Haeru, Inc.",
+      "startDate": "2025-08",
+      "endDate": "2026-02",
       "bullets": [
         "Built the complete Figma design system defining color palettes, visual components, and UI architecture while collaborating with the Lead Engineer to map out end to end UX flows.",
         "Created the brand's visual identity from scratch, including logo design, mascots, and motion animations built in After Effects.",
@@ -60,6 +62,8 @@
     {
       "role": "Multimedia Artist & Animator",
       "company": "Freelance",
+      "startDate": "",
+      "endDate": "",
       "bullets": [
         "Produced high-quality packaging and visual designs for multiple clients to increase product visual appeal and market recognition.",
         "Delivered advanced 2D and 3D animations, motion graphics, and visual content for advertising and storytelling projects.",
@@ -69,6 +73,8 @@
     {
       "role": "Production Assistant (OJT Intern)",
       "company": "iME Entertainment",
+      "startDate": "",
+      "endDate": "2024-07",
       "bullets": [
         "Managed live technical booth operations for K-pop group WHIB's Manila Mall Tour, synchronizing lighting, video, and audio assets.",
         "Edited event audio files and led technical runs to ensure seamless live performances.",
@@ -79,6 +85,8 @@
     {
       "role": "Graphics and Content Editor (OJT Intern)",
       "company": "DYLN Corporation",
+      "startDate": "2024-06",
+      "endDate": "2024-07",
       "bullets": [
         "Produced visual assets and graphic designs for DYLN Corporation's soap brand advertising campaigns.",
         "Created daily thematic video content to drive engagement on corporate platforms.",
@@ -89,6 +97,9 @@
   ],
   "education": [
     {
+      "school": "Bulacan State University",
+      "degree": "Bachelor of Fine Arts Major in Visual Communication",
+      "graduationDate": "2025-07",
       "title": "Bachelor of Fine Arts Major in Visual Communication",
       "detail": "Graduated Bulacan State University mid-2025"
     }
