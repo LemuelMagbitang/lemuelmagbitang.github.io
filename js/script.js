@@ -35,6 +35,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   // (nothing hand-picked, and no automatic match), regardless of this.
   let SHOW_SOFTWARE_LOGOS = false;
 
+  // Which artwork the homepage/about hero banner loops, and how it
+  // transitions between them. Both live in data/settings.json's
+  // heroTiming object, set from the "Hero Loop Animation" screen in
+  // the CMS. Declared here, at the very top, for the same reason
+  // every other switch on this list is: initHeroBanner (much further
+  // down) reads these, and it can run before this script has finished
+  // executing top to bottom if it's ever called from an early event.
+  //   'latest' — auto-pulls from the site's actual projects (today's
+  //     behavior), capped at 5.
+  //   'manual' — uses exactly what's in data/hero-loop.json, however
+  //     many entries that is: 1 in, 1 loops; 3 in, 3 loop.
+  let HERO_LOOP_MODE = 'latest';
+  //   'kenburns' — the slow continuous zoom this site has always had.
+  //   'fade' — a plain crossfade, no zoom.
+  //   'none' — an instant cut, no fade either.
+  let HERO_TRANSITION = 'kenburns';
+  let HERO_CROSSFADE_MS = 3500;
+
   // Holds About's software-skills list once it loads, purely so
   // applySettings (right below) can re-render that list if
   // showSoftwareLogos arrives from data/settings.json AFTER
@@ -111,6 +129,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof remote.showCardBadges === 'boolean') SHOW_CARD_BADGES = remote.showCardBadges;
     if (typeof remote.showReviews === 'boolean') SHOW_REVIEWS = remote.showReviews;
     if (typeof remote.showSoftwareLogos === 'boolean') SHOW_SOFTWARE_LOGOS = remote.showSoftwareLogos;
+    if (remote.heroTiming) {
+      if (remote.heroTiming.loopMode === 'latest' || remote.heroTiming.loopMode === 'manual') HERO_LOOP_MODE = remote.heroTiming.loopMode;
+      if (['kenburns','fade','none'].includes(remote.heroTiming.transitionStyle)) HERO_TRANSITION = remote.heroTiming.transitionStyle;
+      if (Number.isFinite(Number(remote.heroTiming.crossfadeMs)) && Number(remote.heroTiming.crossfadeMs) >= 500) HERO_CROSSFADE_MS = Number(remote.heroTiming.crossfadeMs);
+    }
 
     // Re-apply every toggle-dependent bit of DOM now that the values
     // may have changed. PROTECTION_ENABLED needs no re-apply here — it's
@@ -146,12 +169,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (remote.siteTitle) document.title = remote.siteTitle;
   }
 
-  if (window.SETTINGS_URL) {
-    fetch(window.SETTINGS_URL)
-      .then(r => r.json())
-      .then(applySettings)
-      .catch(err => console.warn('Settings: could not load', window.SETTINGS_URL, err));
-  }
+  const settingsReady = window.SETTINGS_URL
+    ? fetch(window.SETTINGS_URL).then(r => r.json()).then(applySettings).catch(err => console.warn('Settings: could not load', window.SETTINGS_URL, err))
+    : Promise.resolve();
 
 
   /* =========================================
@@ -175,6 +195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     el.className = 'media-item';
     if (m.type === 'video') el.setAttribute('data-video', m.src || '');
     else if (m.type === 'youtube') el.setAttribute('data-youtube', m.src || '');
+    else if (m.type === 'lottie') el.setAttribute('data-lottie', m.src || '');
     else el.setAttribute('data-image', m.src || '');
     if (m.caption) el.setAttribute('data-description', m.caption);
     if (m.orientation) el.setAttribute('data-orientation', m.orientation);
@@ -199,22 +220,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const thumb = document.createElement('div');
     thumb.className = 'card-thumbnail';
     const t = p.thumbnail || {};
+    if (t.type) thumb.setAttribute('data-thumbnail-type', t.type);
     if (t.src) {
-      // A real thumbnail image: focus/zoom go on the <img> itself,
-      // matching the convention already used in the static markup.
-      const img = document.createElement('img');
-      img.src = t.src;
-      img.alt = p.title || 'Project artwork';
-      if (t.focus) img.setAttribute('data-focus', t.focus);
-      if (t.zoom && Number(t.zoom) !== 1) img.setAttribute('data-zoom', t.zoom);
-      thumb.appendChild(img);
+      const media = buildThumbnailMedia({type:t.type||heroMediaTypeFromSrc(t.src),src:t.src}, p.title || 'Project artwork');
+      if (media) {
+        if (t.focus) media.setAttribute('data-focus', t.focus);
+        if (t.zoom && Number(t.zoom)!==1) media.setAttribute('data-zoom', t.zoom);
+        if (t.rotate) media.setAttribute('data-rotate', t.rotate);
+        thumb.appendChild(media);
+      }
     } else {
-      // No thumbnail set — leave it empty so fillMissingThumbnails()
-      // (section 1, right after this) fills it from the first media
-      // item, same as the static markup does. Focus/zoom go on the
-      // wrapper itself since there's no <img> yet to put them on.
       if (t.focus) thumb.setAttribute('data-focus', t.focus);
-      if (t.zoom && Number(t.zoom) !== 1) thumb.setAttribute('data-zoom', t.zoom);
+      if (t.zoom && Number(t.zoom)!==1) thumb.setAttribute('data-zoom', t.zoom);
     }
     card.appendChild(thumb);
 
@@ -258,8 +275,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const res = await fetch(window.PROJECTS_URL);
       if (!res.ok) return;
-      const list = await res.json();
-      if (!Array.isArray(list) || !list.length) return;
+      const raw = await res.json();
+      const list = Array.isArray(raw) ? raw : (Array.isArray(raw.filters) ? raw.filters : []);
+      if (!list.length) return;
 
       const frag = document.createDocumentFragment();
       list.forEach(p => frag.appendChild(buildProjectCardEl(p)));
@@ -523,7 +541,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (expList && Array.isArray(a.experience) && a.experience.length) {
         expList.innerHTML = '';
         a.experience.forEach(exp => {
-          expList.appendChild(buildTimelineBlock({ title: exp.role, dateLine: exp.company, bullets: exp.bullets }));
+          expList.appendChild(buildTimelineBlock({ title: exp.role, dateLine: [exp.company, exp.startDate || exp.endDate ? `${exp.startDate || ''}${exp.startDate || exp.endDate ? ' – ' : ''}${exp.endDate || ''}` : ''].filter(Boolean).join(' · '), bullets: exp.bullets }));
         });
       }
 
@@ -531,7 +549,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (eduList && Array.isArray(a.education) && a.education.length) {
         eduList.innerHTML = '';
         a.education.forEach(e => {
-          eduList.appendChild(buildTimelineBlock({ title: e.title, dateLine: e.detail, bullets: [] }));
+          eduList.appendChild(buildTimelineBlock({ title: e.school || e.title, dateLine: [e.degree, e.graduationDate].filter(Boolean).join(' · ') || e.detail, bullets: [] }));
         });
       }
 
@@ -834,39 +852,44 @@ document.addEventListener('DOMContentLoaded', async () => {
   // the card's own first media-list item instead — an image if the
   // first item is data-image, or a YouTube thumbnail if it's
   // data-youtube. Runs once, before anything else reads the grid.
+  function buildThumbnailMedia(source, altText){
+    if (!source || !source.src) return null;
+    let media;
+    if (source.type === 'video') {
+      media=document.createElement('video'); media.src=source.src; media.muted=true; media.loop=true; media.autoplay=true; media.playsInline=true; media.preload='metadata';
+    } else if (source.type === 'lottie') {
+      media=document.createElement('lottie-player'); media.setAttribute('src',source.src); media.setAttribute('autoplay',''); media.setAttribute('loop',''); media.setAttribute('background','transparent');
+    } else {
+      media=document.createElement('img'); media.src=source.src; media.alt=altText||'Project artwork';
+    }
+    media.classList.add('project-thumb-media');
+    return media;
+  }
+
+  function projectFallbackSource(card){
+    const image=card.querySelector('.project-media-list .media-item[data-image]');
+    if(image) return {type:'image',src:image.getAttribute('data-image')};
+    const video=card.querySelector('.project-media-list .media-item[data-video]');
+    if(video) return {type:'video',src:video.getAttribute('data-video')};
+    const lottie=card.querySelector('.project-media-list .media-item[data-lottie]');
+    if(lottie) return {type:'lottie',src:lottie.getAttribute('data-lottie')};
+    const yt=card.querySelector('.project-media-list .media-item[data-youtube]');
+    if(yt){ const {id}=parseYouTubeUrl(yt.getAttribute('data-youtube')); if(id)return {type:'image',src:`https://img.youtube.com/vi/${id}/hqdefault.jpg`}; }
+    return null;
+  }
+
   function fillMissingThumbnails() {
     document.querySelectorAll('.project-card').forEach(card => {
-      const thumbWrap = card.querySelector('.card-thumbnail');
-      if (!thumbWrap) return;
-
-      const existingImg = thumbWrap.querySelector('img');
-      if (existingImg && existingImg.getAttribute('src')) return; // already has one
-
-      const firstImageItem = card.querySelector('.project-media-list .media-item[data-image]');
-      const firstVideoItem = card.querySelector('.project-media-list .media-item[data-youtube]');
-
-      let fallbackSrc = null;
-
-      if (firstImageItem) {
-        fallbackSrc = firstImageItem.getAttribute('data-image');
-      } else if (firstVideoItem) {
-        const { id } = parseYouTubeUrl(firstVideoItem.getAttribute('data-youtube'));
-        if (id) fallbackSrc = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
-      }
-
-      if (!fallbackSrc) return; // this card has nothing to fall back to
-
-      const titleEl = card.querySelector('.glass-info h3');
-      const altText = titleEl ? titleEl.textContent : 'Project artwork';
-
-      if (existingImg) {
-        existingImg.src = fallbackSrc;
-      } else {
-        const img = document.createElement('img');
-        img.src = fallbackSrc;
-        img.alt = altText;
-        thumbWrap.appendChild(img);
-      }
+      const wrap=card.querySelector('.card-thumbnail'); if(!wrap) return;
+      if(wrap.querySelector('.project-thumb-media')) return;
+      const existing=wrap.querySelector('img');
+      if(existing && existing.getAttribute('src')) { existing.classList.add('project-thumb-media'); return; }
+      const source=projectFallbackSource(card); if(!source) return;
+      const titleEl=card.querySelector('.glass-info h3');
+      const media=buildThumbnailMedia(source,titleEl?titleEl.textContent:'Project artwork');
+      if(media) wrap.appendChild(media);
+      if(source.type==='video') media.setAttribute('data-video-thumb','');
+      if(source.type==='lottie') media.setAttribute('data-lottie-thumb','');
     });
   }
   fillMissingThumbnails();
@@ -890,25 +913,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // there's no <img> yet for you to add them to directly.
   function applyThumbnailAdjustments() {
     document.querySelectorAll('.project-card .card-thumbnail').forEach(wrap => {
-      const img = wrap.querySelector('img');
-      if (!img) return;
-
-      const focus = img.getAttribute('data-focus') || wrap.getAttribute('data-focus');
-      const zoom = img.getAttribute('data-zoom') || wrap.getAttribute('data-zoom');
-      const rotate = img.getAttribute('data-rotate') || wrap.getAttribute('data-rotate');
-
-      // transformOrigin has to match objectPosition, not just default
-      // to center — object-position decides which part of the image
-      // is visible at all; transform-origin decides which point the
-      // zoom scales FROM. Set focus without also moving the zoom's
-      // anchor to match, and zooming in visibly pulls away from
-      // wherever you dragged the focus point instead of magnifying
-      // it — exactly the bug this fixes. The hero banner's own
-      // focus/zoom (applyFocalPoint, above) already gets this right;
-      // this brings project thumbnails in line with it.
-      if (focus) { img.style.objectPosition = focus; img.style.transformOrigin = focus; }
-      if (zoom) img.style.setProperty('--thumb-zoom', zoom);
-      if (rotate) img.style.setProperty('--thumb-rotate', rotate + 'deg');
+      const media=wrap.querySelector('.project-thumb-media, img'); if(!media) return;
+      const focus=media.getAttribute('data-focus')||wrap.getAttribute('data-focus');
+      const zoom=media.getAttribute('data-zoom')||wrap.getAttribute('data-zoom');
+      const rotate=media.getAttribute('data-rotate')||wrap.getAttribute('data-rotate');
+      if(focus){media.style.objectPosition=focus;media.style.transformOrigin=focus;}
+      if(zoom)media.style.setProperty('--thumb-zoom',zoom);
+      if(rotate)media.style.setProperty('--thumb-rotate',rotate+'deg');
     });
   }
   applyThumbnailAdjustments();
@@ -1049,8 +1060,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // About page (at /about/) reuses them they must be resolved against
   // the root rather than against /about/, or every slide 404s.
   function collectHeroSources(doc, baseUrl) {
-    const cards = doc.querySelectorAll('#portfolioGrid .project-card');
-
+    const cards = doc.querySelectorAll('.project-card');
     return Array.from(cards).map(card => {
       const thumbWrap = card.querySelector('.card-thumbnail');
       const thumbImg = thumbWrap ? thumbWrap.querySelector('img') : null;
@@ -1059,17 +1069,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       // <img src> if one was written by hand, else the card's first
       // data-image, else its first YouTube thumbnail.
       let rawSrc = thumbImg ? thumbImg.getAttribute('src') : null;
-
+      let explicitType = thumbWrap ? thumbWrap.getAttribute('data-thumbnail-type') : null;
+      const thumbMedia = thumbWrap ? thumbWrap.querySelector('.project-thumb-media') : null;
+      if (!rawSrc && thumbMedia) {
+        rawSrc = thumbMedia.getAttribute('src');
+        explicitType = explicitType || (thumbMedia.tagName === 'VIDEO' ? 'video' : thumbMedia.tagName === 'LOTTIE-PLAYER' ? 'lottie' : 'image');
+      }
       if (!rawSrc) {
         const firstImageItem = card.querySelector('.project-media-list .media-item[data-image]');
-        if (firstImageItem) {
-          rawSrc = firstImageItem.getAttribute('data-image');
-        } else {
-          const firstVideoItem = card.querySelector('.project-media-list .media-item[data-youtube]');
-          if (firstVideoItem) {
-            const { id } = parseYouTubeUrl(firstVideoItem.getAttribute('data-youtube'));
-            if (id) rawSrc = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
-          }
+        const firstVideoItem = card.querySelector('.project-media-list .media-item[data-video]');
+        const firstLottieItem = card.querySelector('.project-media-list .media-item[data-lottie]');
+        if (firstImageItem) rawSrc = firstImageItem.getAttribute('data-image');
+        else if (firstVideoItem) rawSrc = firstVideoItem.getAttribute('data-video');
+        else if (firstLottieItem) rawSrc = firstLottieItem.getAttribute('data-lottie');
+        else {
+          const firstYouTubeItem = card.querySelector('.project-media-list .media-item[data-youtube]');
+          if (firstYouTubeItem) { const { id } = parseYouTubeUrl(firstYouTubeItem.getAttribute('data-youtube')); if (id) rawSrc = `https://img.youtube.com/vi/${id}/hqdefault.jpg`; }
         }
       }
 
@@ -1083,32 +1098,50 @@ document.addEventListener('DOMContentLoaded', async () => {
       const titleEl = card.querySelector('.glass-info h3');
 
       return {
+        type: explicitType || heroMediaTypeFromSrc(rawSrc),
         src,
         alt: (thumbImg && thumbImg.getAttribute('alt')) || (titleEl ? titleEl.textContent : 'Featured artwork'),
-        focus: (thumbImg && thumbImg.getAttribute('data-focus')) || (thumbWrap && thumbWrap.getAttribute('data-focus')) || null
+        focus: (thumbImg && thumbImg.getAttribute('data-focus')) || (thumbWrap && thumbWrap.getAttribute('data-focus')) || null,
+        zoom: (thumbImg && thumbImg.getAttribute('data-zoom')) || null,
+        rotate: (thumbImg && thumbImg.getAttribute('data-rotate')) || null
       };
     }).filter(Boolean);
   }
 
+  // Guesses a hero slide's media type from its file extension — used
+  // wherever the source doesn't already carry an explicit type field
+  // (the DOM-scraping path above has no such attribute to read).
+  // data/hero-loop.json and data/projects.json entries carry their own
+  // real `type`, read directly instead of guessed, in the two
+  // functions below.
+  function heroMediaTypeFromSrc(src) {
+    const clean = (src || '').split('?')[0].split('#')[0].toLowerCase();
+    if (/\.(mp4|webm|mov|m4v)$/.test(clean)) return 'video';
+    if (/\.json$/.test(clean)) return 'lottie';
+    return 'image';
+  }
+
   // The data/projects.json equivalent of collectHeroSources's per-card
   // mapping above — same order of preference (explicit thumbnail, then
-  // first image media item, then first YouTube item's thumbnail), just
+  // first media item, then first YouTube item's thumbnail), just
   // reading JSON fields instead of DOM attributes since there's no
   // rendered markup to read them from here.
   function heroSourceFromProjectData(p, baseUrl) {
     if (!p) return null;
     const thumb = p.thumbnail || {};
     let rawSrc = thumb.src || null;
+    let type = rawSrc ? (thumb.type || heroMediaTypeFromSrc(rawSrc)) : null;
 
     if (!rawSrc && Array.isArray(p.media)) {
-      const firstImage = p.media.find(m => m && m.type === 'image' && m.src);
-      if (firstImage) {
-        rawSrc = firstImage.src;
+      const firstUsable = p.media.find(m => m && m.src && (m.type === 'image' || m.type === 'video' || m.type === 'lottie'));
+      if (firstUsable) {
+        rawSrc = firstUsable.src;
+        type = firstUsable.type;
       } else {
         const firstYouTube = p.media.find(m => m && m.type === 'youtube' && m.src);
         if (firstYouTube) {
           const { id } = parseYouTubeUrl(firstYouTube.src);
-          if (id) rawSrc = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+          if (id) { rawSrc = `https://img.youtube.com/vi/${id}/hqdefault.jpg`; type = 'image'; }
         }
       }
     }
@@ -1120,73 +1153,113 @@ document.addEventListener('DOMContentLoaded', async () => {
       try { src = new URL(rawSrc, baseUrl).href; } catch (e) { /* keep raw */ }
     }
 
-    return { src, alt: p.title || 'Featured artwork', focus: thumb.focus || null };
+    return { type: type || 'image', src, alt: p.title || 'Featured artwork', focus: thumb.focus || null, zoom: thumb.zoom || null, rotate: thumb.rotate || null };
+  }
+
+  // Same shape again, this time for a hand-curated entry in
+  // data/hero-loop.json — used only in 'manual' loop mode. Every field
+  // already exists on the entry itself; this just resolves its path
+  // against the site root, same as every other data-driven path here.
+  function heroSourceFromManualEntry(item, baseUrl) {
+    if (!item || !item.src) return null;
+    let src = item.src;
+    try { src = new URL(item.src, baseUrl).href; } catch (e) { /* keep raw */ }
+    return {
+      type: item.type || heroMediaTypeFromSrc(item.src),
+      src,
+      alt: item.alt || 'Featured artwork',
+      focus: item.focus || null,
+      zoom: item.zoom || null,
+      rotate: item.rotate || null
+    };
   }
 
   async function initHeroBanner() {
     const heroContainer = document.getElementById('heroBanner') || document.getElementById('heroBannerAbout');
     if (!heroContainer) return; // this page has no hero banner at all
 
-    let heroSources = collectHeroSources(document, null);
+    const siteRootUrl = new URL('/', window.location.href).href;
+    let sources = [];
 
-    if (heroSources.length === 0) {
-      // No grid on this page (i.e. we're on About) — read the same
-      // project data the Works page itself renders from, straight out
-      // of data/projects.json, rather than fetching and parsing the
-      // Works page's HTML. That HTML-scraping approach depended on
-      // real artwork sitting in the Works page's static markup, which
-      // stopped being true once that markup was trimmed down to a
-      // single placeholder fallback card — this doesn't have that
-      // dependency at all, so it isn't at risk of breaking again the
-      // next time that markup changes.
+    if (HERO_LOOP_MODE === 'manual') {
+      // Hand-curated list from the "Hero Loop Animation" screen in the
+      // CMS — used exactly as given, however many entries that is (1
+      // in, 1 loops; 3 in, 3 loop), never padded or trimmed to 5.
       try {
-        const projectsUrl = new URL('../data/projects.json', window.location.href).href;
-        const response = await fetch(projectsUrl);
-        const list = await response.json();
-
-        // THE BUG THIS FIXES: every asset path in projects.json, like
-        // "assets/projects/haeru/haeru-logo-design.jpg", is meant to be
-        // resolved against the SITE ROOT — same convention as every
-        // other path in this file (see the big comment above
-        // collectHeroSources). This used to pass response.url (the
-        // fetched JSON file's own URL, something like
-        // ".../data/projects.json") as that resolution base instead.
-        // Resolving a relative path against a URL that ends in a
-        // filename replaces just that filename, not the whole
-        // directory — so "assets/projects/x.jpg" resolved against
-        // ".../data/projects.json" became ".../data/assets/projects/x.jpg",
-        // a URL that was never going to exist. That's exactly the
-        // 404s (and the blank hero banner they caused, since every
-        // slide was a broken image) in the About page console.
-        //
-        // siteRootUrl strips everything after the domain, giving the
-        // one base every one of these paths was actually written
-        // against.
-        const siteRootUrl = new URL('/', window.location.href).href;
-
-        heroSources = (Array.isArray(list) ? list : [])
-          .map(p => heroSourceFromProjectData(p, siteRootUrl))
+        const url = new URL('data/hero-loop.json', siteRootUrl).href;
+        const res = await fetch(url);
+        const list = await res.json();
+        sources = (Array.isArray(list) ? list : [])
+          .map(item => heroSourceFromManualEntry(item, siteRootUrl))
           .filter(Boolean);
       } catch (err) {
-        console.warn('Hero banner: could not load artwork from data/projects.json.', err);
-        return;
+        console.warn('Hero banner: could not load data/hero-loop.json.', err);
       }
+    } else {
+      // 'latest' — auto-pulls from the site's own projects, same as
+      // this always worked: read straight off the page's own rendered
+      // cards where they already exist (the homepage), else go to
+      // data/projects.json directly (the About page, which has no
+      // project cards of its own to read from).
+      sources = collectHeroSources(document, null);
+      if (sources.length === 0) {
+        try {
+          const projectsUrl = new URL('data/projects.json', siteRootUrl).href;
+          const response = await fetch(projectsUrl);
+          const list = await response.json();
+          sources = (Array.isArray(list) ? list : [])
+            .map(p => heroSourceFromProjectData(p, siteRootUrl))
+            .filter(Boolean);
+        } catch (err) {
+          console.warn('Hero banner: could not load artwork from data/projects.json.', err);
+          return;
+        }
+      }
+      sources = sources.slice(0, 5); // 'latest' mode's own cap, unrelated to manual mode's dynamic count
     }
 
-    const latestFive = heroSources.slice(0, 5);
-    if (latestFive.length === 0) return;
+    if (sources.length === 0) return;
 
-    latestFive.forEach((source, i) => {
-      const slide = document.createElement('img');
-      slide.src = source.src;
-      slide.alt = source.alt;
-      slide.className = 'slide' + (i === 0 ? ' active' : '');
-      heroContainer.appendChild(slide);
+    heroContainer.classList.remove('transition-kenburns', 'transition-fade', 'transition-none');
+    heroContainer.classList.add('transition-' + HERO_TRANSITION);
 
-      if (slide.complete) {
-        applyFocalPoint(slide, source.focus);
+    sources.forEach((source, i) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'slide' + (i === 0 ? ' active' : '');
+
+      let media;
+      if (source.type === 'video') {
+        media = document.createElement('video');
+        media.src = source.src;
+        media.autoplay = true; media.muted = true; media.loop = true; media.playsInline = true;
+      } else if (source.type === 'lottie') {
+        // <lottie-player> is a custom element from the lottie-player
+        // library (loaded in this page's <head>) — it takes a JSON
+        // animation file the same way an <img> takes a picture file.
+        media = document.createElement('lottie-player');
+        media.setAttribute('src', source.src);
+        media.setAttribute('autoplay', '');
+        media.setAttribute('loop', '');
+        media.setAttribute('background', 'transparent');
       } else {
-        slide.addEventListener('load', () => applyFocalPoint(slide, source.focus), { once: true });
+        media = document.createElement('img');
+        media.src = source.src;
+        media.alt = source.alt;
+      }
+      wrap.appendChild(media);
+      heroContainer.appendChild(wrap);
+
+      if (source.focus) { media.style.objectPosition = source.focus; media.style.transformOrigin = source.focus; }
+      media.style.setProperty('--hero-zoom', source.zoom || 1);
+      media.style.setProperty('--hero-rotate', (source.rotate || 0) + 'deg');
+
+      // Auto face-detection fallback only ever made sense for still
+      // images with no focus point already set by hand — video and
+      // Lottie slides skip it entirely, and an image with an explicit
+      // focus already has what it needs.
+      if (source.type === 'image' && !source.focus) {
+        if (media.complete) applyFocalPoint(media, null);
+        else media.addEventListener('load', () => applyFocalPoint(media, null), { once: true });
       }
     });
 
@@ -1202,9 +1275,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       slides[currentSlide].classList.remove('active');
       currentSlide = (currentSlide + 1) % slides.length;
       slides[currentSlide].classList.add('active');
-    }, 3500); // changes every 3.5 seconds
+    }, HERO_CROSSFADE_MS); // configured in Hero Loop Animation
   }
 
+  await settingsReady;
   initHeroBanner();
 
 
@@ -1573,6 +1647,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const imgUrl = item.getAttribute('data-image');
         const ytUrl = item.getAttribute('data-youtube');
         const videoUrl = item.getAttribute('data-video');
+        const lottieUrl = item.getAttribute('data-lottie');
         const caption = item.getAttribute('data-description');
 
         if (imgUrl) {
@@ -1658,6 +1733,26 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
 
           modalMediaContainer.appendChild(buildMediaEntry(video, caption));
+        }
+
+        if (lottieUrl) {
+          // <lottie-player> plays a Lottie/JSON animation the same way
+          // <video> plays a video file — same orientation handling as
+          // video above (manual override, else a landscape default),
+          // since there's no equivalent of videoWidth/videoHeight to
+          // read the real proportions from up front.
+          const player = document.createElement('lottie-player');
+          player.setAttribute('src', lottieUrl);
+          player.setAttribute('autoplay', '');
+          player.setAttribute('loop', '');
+          player.setAttribute('background', 'transparent');
+
+          const manualLottieOrientation = item.getAttribute('data-orientation');
+          if (manualLottieOrientation === 'portrait') player.classList.add('yt-portrait');
+          else if (manualLottieOrientation === 'square') player.classList.add('yt-square');
+          else player.classList.add('yt-landscape');
+
+          modalMediaContainer.appendChild(buildMediaEntry(player, caption));
         }
       });
     } else {

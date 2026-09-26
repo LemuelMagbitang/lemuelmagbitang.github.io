@@ -159,58 +159,30 @@ body {
 }
 
 .hero-banner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow: hidden;
-  background-color: #121212;
-  z-index: 1;
+  position:absolute; inset:0; overflow:hidden; background-color:#121212; z-index:1;
 }
-
 .hero-banner::after {
-  content: ''; 
-  position: absolute; 
-  inset: 0;
-  background: linear-gradient(to bottom, rgba(18,18,18,0.4) 0%, #121212 100%);
-  z-index: 2;
+  content:''; position:absolute; inset:0; background:linear-gradient(to bottom,rgba(18,18,18,.4) 0%,#121212 100%); z-index:2; pointer-events:none;
 }
-
-.hero-banner img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  /* Biases the crop toward the top ~1/5 of the image, which is where
-     faces/heads usually sit in character art and portraits. Override
-     per-artwork by adding data-focus="50% 10%" to that project's
-     thumbnail <img> in index.html — script.js will pick it up. */
-  object-position: center 18%;
-  transform-origin: center 18%;
-  opacity: 0;
-  transition: opacity 1.5s ease-in-out;
-  will-change: opacity, transform;
-  /* Runs continuously on every slide at once, in sync, forever — never
-     tied to .active. That's deliberate: if the zoom were only applied
-     while a slide is active, removing that class the instant it fades
-     out would snap the transform back to nothing instantly (a jump
-     cut). With one ambient loop shared by all slides, whichever one
-     is visible just gets caught wherever that loop currently is — no
-     start/stop, so nothing ever snaps. */
-  animation: hero-kenburns 14s ease-in-out infinite;
+.hero-banner .slide {
+  position:absolute; inset:0; opacity:0; z-index:0; transition:opacity 1.5s ease-in-out; overflow:hidden;
 }
-
-.hero-banner img.active {
-  opacity: 0.4;
+.hero-banner .slide.active { opacity:.4; z-index:1; }
+.hero-banner .slide img,
+.hero-banner .slide video,
+.hero-banner .slide lottie-player {
+  position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:cover; object-position:center 18%; transform-origin:center 18%; --hero-zoom:1; --hero-rotate:0deg; transform:scale(var(--hero-zoom)) rotate(var(--hero-rotate)); will-change:transform,opacity;
 }
-
+.hero-banner .slide lottie-player { background:transparent; }
+.hero-banner.transition-kenburns .slide.active img,
+.hero-banner.transition-kenburns .slide.active video,
+.hero-banner.transition-kenburns .slide.active lottie-player { animation:hero-kenburns 3.5s ease-out both; }
+.hero-banner.transition-fade .slide,
+.hero-banner.transition-none .slide { transition-property:opacity; }
+.hero-banner.transition-none .slide { transition-duration:0s; }
 @keyframes hero-kenburns {
-  0%   { transform: scale(1); }
-  50%  { transform: scale(1.15); }
-  100% { transform: scale(1); }
+  0% { transform:scale(var(--hero-zoom)) rotate(var(--hero-rotate)); }
+  100% { transform:scale(calc(var(--hero-zoom) * 1.08)) rotate(var(--hero-rotate)); }
 }
 
 .hero-overlay { position: relative; z-index: 3; text-align: center; padding: 0 20px; }
@@ -465,7 +437,9 @@ body {
   position: relative;
 }
 
-.card-thumbnail img {
+.card-thumbnail img,
+.card-thumbnail video,
+.card-thumbnail lottie-player {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -478,7 +452,9 @@ body {
   transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.project-card:hover .card-thumbnail img {
+.project-card:hover .card-thumbnail img,
+.project-card:hover .card-thumbnail video,
+.project-card:hover .card-thumbnail lottie-player {
   /* Multiplies on top of any manual zoom rather than overriding it,
      so the hover effect still works even on an already-zoomed thumbnail. */
   transform: scale(calc(var(--thumb-zoom) * 1.05)) rotate(var(--thumb-rotate));
@@ -567,58 +543,30 @@ body {
 }
 
 .hero-banner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  overflow: hidden;
-  background-color: #121212;
-  z-index: 1;
+  position:absolute; inset:0; overflow:hidden; background-color:#121212; z-index:1;
 }
-
 .hero-banner::after {
-  content: ''; 
-  position: absolute; 
-  inset: 0;
-  background: linear-gradient(to bottom, rgba(18,18,18,0.4) 0%, #121212 100%);
-  z-index: 2;
+  content:''; position:absolute; inset:0; background:linear-gradient(to bottom,rgba(18,18,18,.4) 0%,#121212 100%); z-index:2; pointer-events:none;
 }
-
-.hero-banner img {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  /* Biases the crop toward the top ~1/5 of the image, which is where
-     faces/heads usually sit in character art and portraits. Override
-     per-artwork by adding data-focus="50% 10%" to that project's
-     thumbnail <img> in index.html — script.js will pick it up. */
-  object-position: center 18%;
-  transform-origin: center 18%;
-  opacity: 0;
-  transition: opacity 1.5s ease-in-out;
-  will-change: opacity, transform;
-  /* Runs continuously on every slide at once, in sync, forever — never
-     tied to .active. That's deliberate: if the zoom were only applied
-     while a slide is active, removing that class the instant it fades
-     out would snap the transform back to nothing instantly (a jump
-     cut). With one ambient loop shared by all slides, whichever one
-     is visible just gets caught wherever that loop currently is — no
-     start/stop, so nothing ever snaps. */
-  animation: hero-kenburns 14s ease-in-out infinite;
+.hero-banner .slide {
+  position:absolute; inset:0; opacity:0; z-index:0; transition:opacity 1.5s ease-in-out; overflow:hidden;
 }
-
-.hero-banner img.active {
-  opacity: 0.4;
+.hero-banner .slide.active { opacity:.4; z-index:1; }
+.hero-banner .slide img,
+.hero-banner .slide video,
+.hero-banner .slide lottie-player {
+  position:absolute; inset:0; width:100%; height:100%; display:block; object-fit:cover; object-position:center 18%; transform-origin:center 18%; --hero-zoom:1; --hero-rotate:0deg; transform:scale(var(--hero-zoom)) rotate(var(--hero-rotate)); will-change:transform,opacity;
 }
-
+.hero-banner .slide lottie-player { background:transparent; }
+.hero-banner.transition-kenburns .slide.active img,
+.hero-banner.transition-kenburns .slide.active video,
+.hero-banner.transition-kenburns .slide.active lottie-player { animation:hero-kenburns 3.5s ease-out both; }
+.hero-banner.transition-fade .slide,
+.hero-banner.transition-none .slide { transition-property:opacity; }
+.hero-banner.transition-none .slide { transition-duration:0s; }
 @keyframes hero-kenburns {
-  0%   { transform: scale(1); }
-  50%  { transform: scale(1.15); }
-  100% { transform: scale(1); }
+  0% { transform:scale(var(--hero-zoom)) rotate(var(--hero-rotate)); }
+  100% { transform:scale(calc(var(--hero-zoom) * 1.08)) rotate(var(--hero-rotate)); }
 }
 
 .hero-overlay { position: relative; z-index: 3; text-align: center; padding: 0 20px; }
@@ -873,7 +821,9 @@ body {
   position: relative;
 }
 
-.card-thumbnail img {
+.card-thumbnail img,
+.card-thumbnail video,
+.card-thumbnail lottie-player {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -886,7 +836,9 @@ body {
   transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.project-card:hover .card-thumbnail img {
+.project-card:hover .card-thumbnail img,
+.project-card:hover .card-thumbnail video,
+.project-card:hover .card-thumbnail lottie-player {
   /* Multiplies on top of any manual zoom rather than overriding it,
      so the hover effect still works even on an already-zoomed thumbnail. */
   transform: scale(calc(var(--thumb-zoom) * 1.05)) rotate(var(--thumb-rotate));
@@ -1032,21 +984,10 @@ body {
 .resume-block.borderless h3 { color: #fff; font-size: 1.3rem; padding-bottom: 15px; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.1); }
 
 .skill-list.minimal-list { list-style: none; display: flex; flex-wrap: wrap; gap: 12px; }
+.skill-list.minimal-list { list-style: none; display: flex; flex-wrap: wrap; gap: 12px; }
 .skill-list.minimal-list li { background: rgba(255, 255, 255, 0.05); padding: 8px 18px; border-radius: 30px; font-size: 0.9rem; color: #ddd; letter-spacing: 0.5px; }
-/* A skill shown as a logo instead of its name keeps the same pill
-   shape and height as a text one — just tighter padding, since a
-   logo doesn't need the breathing room text does, and a fixed image
-   height so a wide logo and a tall one still sit at the same size
-   next to each other. */
-.skill-list.minimal-list li.has-logo { padding: 6px 16px; display: flex; align-items: center; }
-/* filter: brightness(0) invert(1) turns whatever colors a logo comes
-   in — Simple Icons' and Clearbit's are often full brand color — into
-   a flat white mark, so every skill's logo reads as one consistent
-   monochrome style matching the site's own light-on-dark look,
-   instead of a row of mismatched brand colors sitting next to each
-   other. opacity brings it down slightly to match the dimmer white
-   the surrounding pill text already uses. */
-.skill-list.minimal-list li .skill-logo { height: 20px; width: auto; max-width: 100px; object-fit: contain; display: block; filter: brightness(0) invert(1); opacity: 0.82; }
+.skill-list.minimal-list li.has-logo { background: transparent; padding: 4px 6px; border-radius: 0; display: flex; align-items: center; min-height: 42px; }
+.skill-list.minimal-list li .skill-logo { height: 34px; width: auto; max-width: 120px; object-fit: contain; display: block; filter: brightness(0) invert(1); opacity: 0.9; }
 
 .clean-timeline {
   margin-bottom: 30px;
@@ -1390,8 +1331,8 @@ body.center-page {
   .resume-main { gap: 40px; }
   
   .skill-list.minimal-list li { padding: 6px 14px; font-size: 0.8rem; }
-  .skill-list.minimal-list li.has-logo { padding: 5px 12px; }
-  .skill-list.minimal-list li .skill-logo { height: 17px; }
+  .skill-list.minimal-list li.has-logo { padding: 4px 5px; }
+  .skill-list.minimal-list li .skill-logo { height: 28px; max-width:100px; }
   
   .lightbox-nav { width: 36px; height: 36px; font-size: 0.8rem; }
   .lightbox-prev { left: 8px; }

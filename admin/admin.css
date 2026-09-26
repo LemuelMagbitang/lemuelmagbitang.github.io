@@ -123,17 +123,17 @@
   .tag-pill{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border:1px solid var(--line);padding:5px 10px 5px 12px;border-radius:20px;font-size:12.5px;color:#eee;}
   .tag-pill button{background:none;border:none;color:#888;font-size:11px;}
   .tag-pill button:hover{color:#fff;}
-  /* Software Skills' variant of .tag-pill: adds a small logo swatch
-     before the name. Clicking the swatch opens the media picker to
-     set/change a logo; a skill with no logo shows a faint placeholder
-     square instead, so there's always something to click. */
-  .skill-pill{padding-left:5px;}
-  .skill-pill-icon{width:22px;height:22px;border-radius:5px;background:#0a0a0a;border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;flex-shrink:0;}
+  /* Software skills editor: logo controls are compact, but the live About page
+     should never make the software itself look like a tag/pill. */
+  .skill-editor-row{display:flex;align-items:center;gap:8px;padding:5px 0;color:#eee;width:100%;}
+  .skill-pill-icon{width:30px;height:30px;border-radius:6px;background:#0a0a0a;border:1px solid var(--line-soft);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;flex-shrink:0;}
   .skill-pill-icon:hover{border-color:rgba(255,255,255,.3);}
   .skill-pill-icon img{width:100%;height:100%;object-fit:contain;}
   .skill-pill-icon .fallback-icon{font-size:10px;color:#555;}
   .skill-pill-name{white-space:nowrap;}
-  .skill-pill .clear-icon-btn{color:#e0584f!important;font-size:10px!important;}
+  .skill-editor-row .clear-icon-btn{color:#e0584f!important;font-size:10px!important;}
+  .skill-editor-row + .skill-editor-row{border-top:1px solid var(--line-soft);}
+  .skill-editor-row button[data-removeskill]{margin-left:auto;}
   .tagbox input{border:none;background:none;flex:1;min-width:120px;padding:5px;}
 
   .chip-select{display:flex;flex-wrap:wrap;gap:8px;}
@@ -327,3 +327,6 @@
   @media (max-width:720px){
     .topbar-left .section-label{display:none;}
   }
+
+/* Hero loop manual editor */
+#heroLoopList .card-item{margin-bottom:10px;}
